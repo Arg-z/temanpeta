@@ -1,0 +1,46 @@
+services:
+  server:
+    build: ./server
+    environment:
+      DATABASE_URL: postgres://temanpeta:${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}@db:5432/temanpeta
+      PORT: "3000"
+      NODE_ENV: production
+      # Notifikasi email laporan (opsional; lihat .env)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      REPORT_EMAIL_TO: ${REPORT_EMAIL_TO:-}
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: temanpeta
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}
+      POSTGRES_DB: temanpeta
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Loopback saja: dipakai test/integrasi dari host, tidak terekspos publik.
+      - "127.0.0.1:54329:5432"
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    environment:
+      # TLS publik ditangani nginx di host; Caddy cukup HTTP di dalam container.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      # Terikat ke loopback saja: nginx (yang memegang 80/443 publik bersama
+      # situs lain) meneruskan trafik connext.web.id ke sini.
+      - "127.0.0.1:8088:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  pgdata:

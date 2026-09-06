@@ -1,0 +1,30 @@
+{
+	# Log Caddy cukup ke stdout
+}
+
+{$SITE_ADDRESS} {
+	root * /srv/www
+	encode zstd gzip
+
+	# API dan WebSocket ke backend Node — pakai handle agar tidak
+	# ke-rewrite dulu oleh try_files (urutan direktif Caddy: try_files
+	# berjalan sebelum reverse_proxy).
+	handle /api/* {
+		reverse_proxy server:3000
+	}
+	handle /ws {
+		reverse_proxy server:3000
+	}
+
+	# SPA + blokir path sensitif. `route` mempertahankan urutan tulisan —
+	# respond 404 dieksekusi SEBELUM try_files, jadi /.env dkk tak pernah
+	# jatuh ke fallback SPA.
+	route {
+		@sensitive {
+			path_regexp (?i)(^|/)\.env|(^|/)\.git|(^|/)docker-compose|(^|/)Dockerfile|\.(zip|tar\.gz|tgz|sql|bak|map)$
+		}
+		respond @sensitive 404
+		try_files {path} /index.html
+		file_server
+	}
+}

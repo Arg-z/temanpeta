@@ -1,0 +1,29 @@
+{
+  "name": "temanpeta-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Backend TemanPeta: REST API + WebSocket untuk chat 1-on-1 berbasis wilayah Indonesia.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "pg": "node scripts/dev-postgres.mjs",
+    "test": "node --test --test-force-exit test/"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "nodemailer": "^10.0.0",
+    "pg": "^8.12.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "embedded-postgres": "^18.4.0-beta.17"
+  },
+  "allowScripts": {
+    "@embedded-postgres/linux-x64@18.4.0-beta.17": true
+  },
+  "overrides": {
+    "qs": "^6.15.0"
+  }
+}
