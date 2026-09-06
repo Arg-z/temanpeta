@@ -14,6 +14,10 @@ usermod -aG docker arga || true
 
 echo "==> [3/4] Pasang konfigurasi nginx untuk connext.web.id"
 cp /home/arga/temanpeta/deploy/conf.d-websocket-map.conf /etc/nginx/conf.d/websocket-map.conf
+cp /home/arga/temanpeta/deploy/conf.d-00-hardening.conf /etc/nginx/conf.d/00-hardening.conf
+# File site di repo adalah snapshot konfigurasi live (headers + blok TLS
+# "managed by Certbot"). Pada host BARU yang belum punya sertifikat, blok
+# TLS-nya harus dilepas dulu — gunakan setup-https.sh untuk menerbitkannya.
 cp /home/arga/temanpeta/deploy/nginx-connext.web.id.conf /etc/nginx/sites-available/connext.web.id
 ln -sf /etc/nginx/sites-available/connext.web.id /etc/nginx/sites-enabled/connext.web.id
 nginx -t

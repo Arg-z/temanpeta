@@ -125,7 +125,7 @@ function enterAdmin(me) {
   async function loadUsers(q = '') {
     try {
       const { users } = await api(`/admin/users?q=${encodeURIComponent(q)}`);
-      ui.userList.innerHTML = '';
+      ui.userList.replaceChildren();
       if (users.length === 0) {
         ui.userList.append(el('div', { class: 'empty', text: 'Tidak ada pengguna yang cocok.' }));
       }
@@ -169,7 +169,7 @@ function enterAdmin(me) {
   async function loadReports() {
     try {
       const { reports } = await api('/admin/reports');
-      ui.reportList.innerHTML = '';
+      ui.reportList.replaceChildren();
       if (reports.length === 0) {
         ui.reportList.append(el('div', { class: 'empty', text: 'Belum ada laporan masuk.' }));
       }

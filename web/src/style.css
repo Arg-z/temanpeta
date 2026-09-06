@@ -685,6 +685,12 @@ input:focus {
   border-bottom: 3px solid var(--line);
 }
 
+/* Pengganti style inline flex:1;min-width:0 (CSP style-src ketat). */
+.chat-head-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .chat-head .n {
   font-family: var(--font-pixel);
   font-size: 10px;

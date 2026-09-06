@@ -12,6 +12,12 @@ router.use(requireAuth);
 const searchLimiter = rateLimit({ windowMs: 60_000, max: 30, keyFn: (req) => `srch:${req.user.id}` });
 const presenceLimiter = rateLimit({ windowMs: 60_000, max: 30, keyFn: (req) => `pres:${req.user.id}` });
 const meLimiter = rateLimit({ windowMs: 60_000, max: 20, keyFn: (req) => `me:${req.user.id}` });
+// Endpoint lookup yang sebelumnya tanpa batas — dipagari agar tidak
+// menjadi existence oracle atau beban DB (CWE-770).
+const lookupLimiter = rateLimit({ windowMs: 60_000, max: 30, keyFn: (req) => `lkp:${req.user.id}` });
+const regionListLimiter = rateLimit({ windowMs: 60_000, max: 30, keyFn: (req) => `rgl:${req.user.id}` });
+const locationLimiter = rateLimit({ windowMs: 60_000, max: 30, keyFn: (req) => `loc:${req.user.id}` });
+const friendsMapLimiter = rateLimit({ windowMs: 60_000, max: 60, keyFn: (req) => `fmp:${req.user.id}` });
 
 router.get('/regions', (req, res) => {
   res.json({
@@ -95,7 +101,7 @@ router.patch('/me', meLimiter, async (req, res, next) => {
 
 // Koordinat dikirim hanya saat mengaktifkan visibilitas; server menyimpan
 // wilayahnya saja, tidak ada koordinat presisi di database.
-router.post('/me/location', async (req, res, next) => {
+router.post('/me/location', locationLimiter, async (req, res, next) => {
   try {
     const lat = Number(req.body.lat);
     const lng = Number(req.body.lng);
@@ -119,9 +125,12 @@ router.post('/me/location', async (req, res, next) => {
 // hanya mengatur tampil di peta/daftar wilayah dan pencarian nickname.
 router.get('/users', searchLimiter, async (req, res, next) => {
   try {
-    const q = String(req.query.q ?? '').trim();
+    // Batas panjang + escape wildcard LIKE agar query pencarian tetap
+    // terkendali (%, _ milik pengguna dicari secara harfiah).
+    const q = String(req.query.q ?? '').trim().slice(0, 64);
     if (q.length < 2) return res.json({ users: [] });
     const exact = q.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const like = `%${q.replace(/[%_\\]/g, '\\$&')}%`;
     const { rows } = await query(
       `SELECT * FROM users u
        WHERE u.id <> $1
@@ -144,7 +153,7 @@ router.get('/users', searchLimiter, async (req, res, next) => {
        LIMIT 20`,
       // Kecocokan ID publik persis hanya bila q tepat 8 karakter; string kosong
       // tidak akan pernah cocok dengan ID publik.
-      [req.user.id, exact.length === 8 ? exact : '', `%${q}%`],
+      [req.user.id, exact.length === 8 ? exact : '', like],
     );
     const users = [];
     for (const row of rows) {
@@ -162,7 +171,7 @@ router.get('/users', searchLimiter, async (req, res, next) => {
 });
 
 // Daftar pengguna bervisibilitas nyala di suatu wilayah (kota atau provinsi).
-router.get('/users/region/:code', async (req, res, next) => {
+router.get('/users/region/:code', regionListLimiter, async (req, res, next) => {
   try {
     const region = getRegion(req.params.code);
     if (!region) return bad(res, 404, 'Wilayah tidak ditemukan.');
@@ -192,7 +201,7 @@ router.get('/users/region/:code', async (req, res, next) => {
   }
 });
 
-router.get('/users/:publicId', async (req, res, next) => {
+router.get('/users/:publicId', lookupLimiter, async (req, res, next) => {
   try {
     const other = await getUserByPublicId(req.params.publicId);
     if (!other) return bad(res, 404, 'Pengguna tidak ditemukan.');
@@ -209,7 +218,7 @@ router.get('/users/:publicId', async (req, res, next) => {
 });
 
 // Daftar teman + koordinat wilayah untuk marker peta.
-router.get('/friends-map', async (req, res, next) => {
+router.get('/friends-map', friendsMapLimiter, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT u.* FROM friendships f

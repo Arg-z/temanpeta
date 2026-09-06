@@ -1,5 +1,12 @@
 {
 	# Log Caddy cukup ke stdout
+	servers {
+		# Percayai jaringan docker (nginx di host masuk lewat gateway) supaya
+		# Caddy MENERUSKAN X-Forwarded-For dari nginx, bukan menggantinya —
+		# tanpa ini semua klien terlihat sebagai 172.18.0.1 di backend dan
+		# rate-limit per-IP jatuh jadi satu bucket global.
+		trusted_proxies static 172.18.0.0/16
+	}
 }
 
 {$SITE_ADDRESS} {
@@ -21,7 +28,10 @@
 	# jatuh ke fallback SPA.
 	route {
 		@sensitive {
-			path_regexp (?i)(^|/)\.env|(^|/)\.git|(^|/)docker-compose|(^|/)Dockerfile|\.(zip|tar\.gz|tgz|sql|bak|map)$
+			# config.json: tidak ada file-nya — jangan biarkan jatuh ke SPA
+			# (200 HTML menipu). /.well-known/security.txt: sengaja 404
+			# sampai kontak keamanan ditetapkan (RFC 9116).
+			path_regexp (?i)(^|/)\.env|(^|/)\.git|(^|/)docker-compose|(^|/)Dockerfile|\.(zip|tar\.gz|tgz|sql|bak|map)$|^/config\.json$|^/\.well-known/security\.txt$
 		}
 		respond @sensitive 404
 		try_files {path} /index.html

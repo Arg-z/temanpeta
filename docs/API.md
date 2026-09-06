@@ -4,13 +4,11 @@ Semua respons JSON. Error berbentuk `{ "error": "pesan dalam bahasa Indonesia" }
 
 ## Autentikasi
 
-Setelah `POST /api/register` atau `POST /api/login`, klien menerima `token`. Kirim pada setiap request:
+Setelah `POST /api/register` atau `POST /api/login`, server menyetel **cookie sesi `tp_session`** (`HttpOnly; Secure; SameSite=Lax; Max-Age=30 hari`, dapat diubah lewat `TOKEN_TTL_DAYS`). Klien tidak pernah melihat atau menyimpan token — browser otomatis mengirim cookie pada setiap request same-origin (`credentials: 'same-origin'`). Token tidak pernah dikirim via URL/query string, dan tidak disimpan di localStorage.
 
-```
-Authorization: Bearer <token>
-```
+Koneksi WebSocket `/ws` memakai cookie yang sama saat handshake; sesi invalid ditutup dengan close code `4001`.
 
-Token berlaku 30 hari (dapat diubah lewat `TOKEN_TTL_DAYS`). Koneksi WebSocket memakai token yang sama via query string: `/ws?token=<token>`.
+Untuk skrip/tes non-browser, header `Authorization: Bearer <token>` masih diterima sebagai fallback (token tidak pernah dikembalikan di body respons; ambil dari header `Set-Cookie`). Token di sisi server disimpan sebagai hash SHA-256.
 
 ### Dua lapis identitas
 
@@ -113,9 +111,9 @@ Bentuk `UserCard` (pengguna lain):
 
 ---
 
-## WebSocket `/ws?token=<token>`
+## WebSocket `/ws`
 
-Koneksi ditolak dengan close code `4001` bila token tidak valid. Kirim `{"type":"ping"}`? — tidak perlu; server mengirim ping protocol tiap 30 detik.
+Autentikasi lewat cookie sesi saat handshake (bukan query string). Koneksi ditolak dengan close code `4001` bila sesi tidak valid/banned, `4003` bila origin berbeda, dan `4008` bila melebihi batas laju/koneksi. Kirim `{"type":"ping"}`? — tidak perlu; server mengirim ping protocol tiap 30 detik.
 
 ### Pesan yang DIKIRIM klien → server
 

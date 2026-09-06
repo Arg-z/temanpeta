@@ -184,7 +184,6 @@ test('ban: login ditolak 403 + sesi lama mati', async () => {
     method: 'POST',
     body: { publicId: victim.publicId, banned: true },
   });
-  console.error('DEBUG ban respons:', rBan.status, JSON.stringify(rBan.json));
   assert.equal(rBan.status, 200);
   const { status: sMe } = await v.fetch('/me');
   assert.equal(sMe, 401, 'sesi korban harus mati setelah diban');
@@ -223,5 +222,233 @@ test('rate limit login aktif (429 setelah batas)', async () => {
   }
   assert.equal(last, 429, 'harus kena 429 sebelum kehabisan 32 percobaan');
 });
+
+// ---------------------------------------------------------------------------
+// Putaran hardening kedua (audit 2026-09-07)
+// ---------------------------------------------------------------------------
+
+test('H-1: cookie sesi malformed tidak boleh menjatuhkan server', async () => {
+  const res = await fetch(`${BASE}/api/me`, { headers: { Cookie: 'tp_session=%' } });
+  assert.equal(res.status, 401, 'cookie invalid harus dijawab 401, bukan crash');
+  const health = await fetch(`${BASE}/api/health`);
+  assert.equal(health.status, 200, 'proses server harus tetap hidup setelah cookie malformed');
+});
+
+test('H-1: cookie malformed pada handshake WS ditolak 4001 tanpa crash', async () => {
+  const WebSocket = (await import('ws')).default;
+  const code = await new Promise((resolve) => {
+    const ws = new WebSocket(`ws://127.0.0.1:3100/ws`, { headers: { Cookie: 'tp_session=%' } });
+    const timer = setTimeout(() => resolve('timeout'), 5000);
+    ws.on('close', (c) => {
+      clearTimeout(timer);
+      resolve(c);
+    });
+    ws.on('error', () => {});
+  });
+  assert.equal(code, 4001, 'handshake dengan cookie malformed harus ditutup 4001');
+  const health = await fetch(`${BASE}/api/health`);
+  assert.equal(health.status, 200, 'proses server harus tetap hidup');
+});
+
+test('M-1: trust proxy dibatasi ke jumlah hop eksplisit (bukan true)', async () => {
+  const { default: app } = await import('../src/index.js');
+  assert.notEqual(app.get('trust proxy'), true, 'trust proxy=true membuat req.ip bisa dipalsukan via XFF');
+  assert.equal(app.get('trust proxy'), 2, 'di belakang nginx + Caddy, hop yang dipercaya tepat 2');
+});
+
+test('M-2: login_id di luar format ditolak 400 sebelum menyentuh DB/audit', async () => {
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(String(a[0]));
+  const c = client('fmt');
+  const r = await c.fetch('/login', {
+    method: 'POST',
+    body: { loginId: 'bad\n[AUDIT] event=forged ip=1.2.3.4', password: 'test12345678' },
+  });
+  console.log = orig;
+  assert.equal(r.status, 400, 'login_id invalid harus 400 tanpa query DB');
+  assert.ok(!lines.join('\n').includes('event=forged'), 'log injection lewat login_id tidak boleh lolos');
+});
+
+test('M-2: timing login untuk login_id tak dikenal tetap menjalankan scrypt', async () => {
+  const c = client('tm');
+  const t0 = performance.now();
+  await c.fetch('/login', {
+    method: 'POST',
+    body: { loginId: `tidakada_${run}`, password: 'salahbanget123' },
+  });
+  const durasiTanpaUser = performance.now() - t0;
+  // scryptSync (N=16384) butuh belasan ms; kalau dilewati, respons < 5 ms.
+  assert.ok(
+    durasiTanpaUser > 5,
+    `login untuk user tak dikenal harus tetap mahal (terukur ${durasiTanpaUser.toFixed(1)} ms)`,
+  );
+});
+
+test('L-1: audit() membersihkan karakter kontrol dari input klien', async () => {
+  const c = client('inj');
+  await c.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest09_${run}`, password: 'test12345678', nickname: 'Sec Nine' },
+  });
+  const target = client('inj2');
+  const rt = await target.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest10_${run}`, password: 'test12345678', nickname: 'Sec Ten' },
+  });
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(String(a[0]));
+  await c.fetch('/reports', {
+    method: 'POST',
+    body: { publicId: `${rt.json.user.publicId}\n[AUDIT] event=forged`, reason: 'uji' },
+  });
+  console.log = orig;
+  const auditLines = lines.join('\n').split('\n').filter((l) => l.includes('[AUDIT]'));
+  assert.equal(auditLines.length, 1, `harus tepat satu baris audit, dapat: ${JSON.stringify(auditLines)}`);
+});
+
+test('L-2: rate limit pada GET /api/users/:publicId (429 setelah batas)', async () => {
+  const c = client('rlu');
+  await c.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest11_${run}`, password: 'test12345678', nickname: 'Sec Eleven' },
+  });
+  let last = 0;
+  for (let i = 0; i < 35; i += 1) {
+    last = (await c.fetch('/users/ZZZZZZZZ')).status;
+    if (last === 429) break;
+  }
+  assert.equal(last, 429, 'lookup langsung harus dibatasi juga');
+});
+
+test('IDOR: user ketiga tidak bisa menerima/menolak permintaan pertemanan orang lain', async () => {
+  const a = client('ia');
+  const b = client('ib');
+  const c = client('ic');
+  const ra = await a.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest12_${run}`, password: 'test12345678', nickname: 'Idor A' },
+  });
+  const rb = await b.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest13_${run}`, password: 'test12345678', nickname: 'Idor B' },
+  });
+  await c.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest14_${run}`, password: 'test12345678', nickname: 'Idor C' },
+  });
+  await a.fetch('/friend-requests', { method: 'POST', body: { publicId: rb.json.user.publicId } });
+  const inbox = await b.fetch('/friend-requests');
+  const id = inbox.json.incoming[0].id;
+  const acc = await c.fetch(`/friend-requests/${id}/accept`, { method: 'POST' });
+  assert.equal(acc.status, 403, 'penerimaan atas nama orang lain harus 403');
+  const del = await c.fetch(`/friend-requests/${id}`, { method: 'DELETE' });
+  assert.equal(del.status, 403, 'penghapusan atas nama orang lain harus 403');
+  const ok = await b.fetch(`/friend-requests/${id}/accept`, { method: 'POST' });
+  assert.equal(ok.status, 200, 'pemilik sah tetap bisa menerima');
+});
+
+test('IDOR: riwayat chat non-teman ditolak (403)', async () => {
+  const a = client('ch1');
+  const b = client('ch2');
+  await a.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest15_${run}`, password: 'test12345678', nickname: 'Chat A' },
+  });
+  const rb = await b.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest16_${run}`, password: 'test12345678', nickname: 'Chat B' },
+  });
+  const { status } = await a.fetch(`/messages/${rb.json.user.publicId}`);
+  assert.equal(status, 403);
+});
+
+test('L-5: query limit negatif/kedaluwarsa tidak menyebabkan 500', async () => {
+  const a = client('lim1');
+  const b = client('lim2');
+  await a.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest17_${run}`, password: 'test12345678', nickname: 'Lim A' },
+  });
+  const rb = await b.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest18_${run}`, password: 'test12345678', nickname: 'Lim B' },
+  });
+  await a.fetch('/friend-requests', { method: 'POST', body: { publicId: rb.json.user.publicId } });
+  const inbox = await b.fetch('/friend-requests');
+  await b.fetch(`/friend-requests/${inbox.json.incoming[0].id}/accept`, { method: 'POST' });
+  const negatif = await a.fetch(`/messages/${rb.json.user.publicId}?limit=-5`);
+  assert.equal(negatif.status, 200, 'limit negatif harus di-clamp, bukan 500');
+  const besar = await a.fetch(`/messages/${rb.json.user.publicId}?limit=99999`);
+  assert.equal(besar.status, 200, 'limit raksasa harus di-clamp ke 100');
+});
+
+test('L-3: token sesi disimpan ter-hash di DB; sesi legacy plaintext otomatis di-upgrade', async () => {
+  const crypto = await import('node:crypto');
+  const { query } = await import('../src/db.js');
+  const c = client('th');
+  const r = await c.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest19_${run}`, password: 'test12345678', nickname: 'Hash Test' },
+  });
+  const setCookie = r.res.headers.getSetCookie().find((s) => s.startsWith('tp_session='));
+  const token = setCookie.split(';')[0].split('=')[1];
+  const hashed = `sha256$${crypto.createHash('sha256').update(token).digest('hex')}`;
+  const { rows } = await query('SELECT token FROM sessions WHERE token = $1', [hashed]);
+  assert.equal(rows.length, 1, 'sesi baru harus tersimpan sebagai hash, bukan plaintext');
+  assert.equal((await query('SELECT 1 FROM sessions WHERE token = $1', [token])).rowCount, 0);
+  assert.equal((await c.fetch('/me')).status, 200, 'sesi hash tetap valid');
+
+  // Sesi legacy (token plaintext, pra-migrasi) harus tetap bisa dipakai lalu di-upgrade.
+  const raw = crypto.randomBytes(32).toString('hex');
+  await query(
+    `INSERT INTO sessions (token, user_id, expires_at)
+     VALUES ($1, (SELECT id FROM users WHERE login_id = $2), now() + interval '1 day')`,
+    [raw, `sectest19_${run}`],
+  );
+  const legacy = await fetch(`${BASE}/api/me`, { headers: { Cookie: `tp_session=${raw}` } });
+  assert.equal(legacy.status, 200, 'sesi legacy plaintext harus tetap diterima');
+  assert.equal((await query('SELECT 1 FROM sessions WHERE token = $1', [raw])).rowCount, 0, 'row legacy harus di-upgrade ke hash');
+  assert.equal((await query('SELECT 1 FROM sessions WHERE token = $1', [hashed])).rowCount, 1);
+});
+
+test('WS: maksimal 5 koneksi bersamaan per pengguna (ke-6 ditutup 4008)', async () => {
+  const WebSocket = (await import('ws')).default;
+  const c = client('wscap');
+  const r = await c.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `sectest20_${run}`, password: 'test12345678', nickname: 'Ws Cap' },
+  });
+  const cookie = r.res.headers.getSetCookie().find((s) => s.startsWith('tp_session='));
+  const openOne = () =>
+    new Promise((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:3100/ws`, { headers: { Cookie: cookie } });
+      ws.on('open', () => resolve(ws));
+      ws.on('close', (code) => reject(new Error(`closed ${code}`)));
+      ws.on('error', () => {});
+    });
+  const kept = [];
+  for (let i = 0; i < 5; i += 1) {
+    kept.push(await openOne());
+    // Beri waktu handler server (auth query async) selesai mendaftarkan
+    // socket ke set online sebelum koneksi berikutnya dibuka.
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  const sixth = await new Promise((resolve) => {
+    const ws = new WebSocket(`ws://127.0.0.1:3100/ws`, { headers: { Cookie: cookie } });
+    const timer = setTimeout(() => resolve('timeout'), 5000);
+    ws.on('close', (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+    ws.on('error', () => {});
+  });
+  assert.equal(sixth, 4008, 'koneksi ke-6 harus ditolak dengan close code 4008');
+  for (const ws of kept) ws.close();
+  const health = await fetch(`${BASE}/api/health`);
+  assert.equal(health.status, 200);
+});
+
 
 

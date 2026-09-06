@@ -14,6 +14,21 @@ export function newToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// Token sesi disimpan ter-hash di DB (prefix membedakan dari token plaintext
+// legacy yang belum ter-upgrade). Kebocoran baca DB tidak lagi = ambil alih sesi.
+export function hashToken(token) {
+  return `sha256$${crypto.createHash('sha256').update(token).digest('hex')}`;
+}
+
+// Token sesi selalu 64 hex dari crypto.randomBytes — allowlist ketat ini
+// menolak nilai cookie malformed tanpa perlu decode apa pun (CWE-248).
+export const TOKEN_RE = /^[0-9a-f]{64}$/;
+
+// Hash scrypt dummy untuk menjaga timing login tetap mahal ketika user tidak
+// ditemukan (anti-enumerasi via timing, CWE-208). Nilainya bukan rahasia.
+export const DUMMY_PASSWORD_HASH =
+  'scrypt$3f9c2b1a7e5d40c8b6a29d31f4e8c07a$c4f2a86be1d93c0758af2e61d4b98c05e7a31f6c8d29b407ae15f3d8c06b2197e5a48f1c3d20b697e4f8a1c5d30b2e79f46a18c5d2e3b708f49a1c6d5e03bf';
+
 export function hashPassword(password) {
   const salt = crypto.randomBytes(16);
   const hash = crypto.scryptSync(password, salt, 64);
@@ -75,8 +90,14 @@ export function resetRateLimits() {
 
 // Catatan audit ringkas ke log container. JANGAN pernah memasukkan
 // password, token, cookie, atau isi pesan ke sini.
+function cleanLog(value, max = 200) {
+  // Karakter kontrol/newline dibuang agar input klien tidak bisa memalsukan
+  // baris audit sendiri (CWE-117 log injection).
+  return String(value).replace(/[\x00-\x1f\x7f]/g, '').slice(0, max);
+}
+
 export function audit(event, req, extra = '') {
-  const ip = req.ip ?? 'unknown';
+  const ip = cleanLog(req.ip ?? 'unknown', 64);
   const user = req.user?.public_id ?? '-';
-  console.log(`[AUDIT] ${new Date().toISOString()} event=${event} ip=${ip} user=${user}${extra ? ` ${extra}` : ''}`);
+  console.log(`[AUDIT] ${new Date().toISOString()} event=${cleanLog(event, 32)} ip=${ip} user=${user}${extra ? ` ${cleanLog(extra)}` : ''}`);
 }

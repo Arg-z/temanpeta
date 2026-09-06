@@ -5,6 +5,7 @@ import {
   verifyPassword,
   generatePublicId,
   LOGIN_ID_RE,
+  DUMMY_PASSWORD_HASH,
   bad,
   rateLimit,
   audit,
@@ -69,8 +70,20 @@ router.post('/login', limiter, async (req, res, next) => {
   try {
     const loginId = String(req.body.loginId ?? '').trim().toLowerCase();
     const password = String(req.body.password ?? '');
+    // Validasi format sebelum menyentuh DB maupun log — menolak karakter
+    // kontrol yang bisa memalsukan baris audit (CWE-117).
+    if (!LOGIN_ID_RE.test(loginId)) {
+      return bad(res, 400, 'Format ID login tidak valid.');
+    }
     const { rows } = await query('SELECT * FROM users WHERE login_id = $1', [loginId]);
-    if (rows.length === 0 || !verifyPassword(password, rows[0].password_hash)) {
+    if (rows.length === 0) {
+      // Jalankan scrypt terhadap hash dummy agar waktu respons user yang
+      // tidak ada sama dengan yang salah password (anti-enumerasi, CWE-208).
+      verifyPassword(password, DUMMY_PASSWORD_HASH);
+      audit('login_fail', req, `login=${loginId}`);
+      return bad(res, 401, 'ID login atau password salah.');
+    }
+    if (!verifyPassword(password, rows[0].password_hash)) {
       audit('login_fail', req, `login=${loginId}`);
       return bad(res, 401, 'ID login atau password salah.');
     }

@@ -34,7 +34,9 @@ router.get('/messages/:publicId', async (req, res, next) => {
     if (!other) return;
     const [low, high] = pair(req.user.id, other.id);
     const before = Number.isFinite(Number(req.query.before)) ? Number(req.query.before) : Number.MAX_SAFE_INTEGER;
-    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    // Clamp ketat [1,100]: nilai negatif/nonsense tidak boleh sampai ke
+    // PostgreSQL sebagai LIMIT (sebelumnya menyebabkan 500).
+    const limit = Math.min(Math.max(Math.trunc(Number(req.query.limit) || 50), 1), 100);
     const { rows } = await query(
       `SELECT id, sender_id, body, created_at FROM messages
        WHERE user_low = $1 AND user_high = $2 AND id < $3

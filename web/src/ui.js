@@ -5,9 +5,10 @@ export function el(tag, props = {}, ...children) {
   for (const [k, v] of Object.entries(props)) {
     if (k === 'class') node.className = v;
     else if (k === 'text') node.textContent = v;
-    else if (k === 'html' || k === 'innerHTML') node.innerHTML = v;
-    else if (k.startsWith('on') && typeof v === 'function') {
-      node.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k.startsWith('on')) {
+      // Hanya function yang jadi listener — string tidak boleh menyusup
+      // menjadi inline event handler (CSP + XSS).
+      if (typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
     } else if (v !== undefined && v !== null) node.setAttribute(k, v);
   }
   for (const child of children.flat()) {
@@ -15,6 +16,13 @@ export function el(tag, props = {}, ...children) {
     node.append(child instanceof Node ? child : document.createTextNode(String(child)));
   }
   return node;
+}
+
+// Satu-satunya jalur innerHTML yang tersisa: ikon SVG statis dari konstanta
+// kode. JANGAN pernah memanggil ini dengan data dari server atau pengguna —
+// untuk data apa pun gunakan text/child text node (lihat el()).
+export function setIcon(node, svg) {
+  node.innerHTML = svg;
 }
 
 const jam = (iso) =>
@@ -31,9 +39,7 @@ export function toast(message, isErr = false) {
   app.append(node);
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => node.remove(), 3500);
-}
-
-/* ---------- modal ---------- */
+}/* ---------- modal ---------- */
 
 export function modal({ title, body, textarea, actions }) {
   closeModal();
@@ -83,7 +89,7 @@ export function closeModal() {
 
 export function renderAuth({ onLogin, onRegister }) {
   const app = document.getElementById('app');
-  app.innerHTML = '';
+  app.replaceChildren();
 
   let mode = 'login';
   let busy = false;
@@ -139,20 +145,20 @@ export function renderAuth({ onLogin, onRegister }) {
   const btnEye = el('button', {
     class: 'eye-btn',
     type: 'button',
-    innerHTML: ICON_EYE,
     title: 'Tampilkan password',
     'aria-label': 'Tampilkan password',
     'aria-pressed': 'false',
     onclick: () => {
       const show = fieldPass.type === 'password';
       fieldPass.type = show ? 'text' : 'password';
-      btnEye.innerHTML = show ? ICON_EYE_OFF : ICON_EYE;
+      setIcon(btnEye, show ? ICON_EYE_OFF : ICON_EYE);
       btnEye.title = show ? 'Sembunyikan password' : 'Tampilkan password';
       btnEye.setAttribute('aria-label', btnEye.title);
       btnEye.setAttribute('aria-pressed', String(show));
       fieldPass.focus();
     },
   });
+  setIcon(btnEye, ICON_EYE);
   const passWrap = el('div', { class: 'pass-wrap' }, fieldPass, btnEye);
 
   const rowNick = el(
@@ -182,7 +188,7 @@ export function renderAuth({ onLogin, onRegister }) {
     rowNick.classList.toggle('hidden', m === 'login');
     btnSubmit.textContent = m === 'login' ? 'MASUK' : 'DAFTAR';
     fieldPass.autocomplete = m === 'login' ? 'current-password' : 'new-password';
-    modeLine.innerHTML = '';
+    modeLine.replaceChildren();
     modeLine.append(m === 'login' ? 'Belum punya akun? ' : 'Sudah punya akun? ', modeBtn);
     modeBtn.textContent = m === 'login' ? 'DAFTAR' : 'MASUK';
   }
@@ -256,7 +262,7 @@ export function renderAuth({ onLogin, onRegister }) {
       el(
         'div',
         { class: 'auth-card pixel-panel' },
-        el('h1', { class: 'logo', innerHTML: 'TEMAN<span>PETA</span>' }),
+        el('h1', { class: 'logo' }, 'TEMAN', el('span', {}, 'PETA')),
         el('p', { class: 'tagline', text: 'Temukan teman baru dari peta Indonesia.' }),
         el(
           'div',
@@ -350,7 +356,7 @@ export function removeOnboarding(host) {
 
 export function renderAdmin({ me, onLogout, onOpenMap }) {
   const app = document.getElementById('app');
-  app.innerHTML = '';
+  app.replaceChildren();
 
   const input = el('input', {
     placeholder: 'Cari nickname, ID login, atau ID publik...',
@@ -370,7 +376,7 @@ export function renderAdmin({ me, onLogout, onOpenMap }) {
         el(
           'div',
           { class: 'admin-head' },
-          el('h1', { class: 'logo', innerHTML: 'TEMAN<span>PETA</span>' }),
+          el('h1', { class: 'logo' }, 'TEMAN', el('span', {}, 'PETA')),
           el(
             'div',
             { class: 'btns' },
@@ -440,7 +446,7 @@ export function adminReportRow(r) {
 
 export function renderAppShell({ onSearch, onToggleVisibility, onOpenFriends, onOpenMe, onLogout, onOpenAdmin }) {
   const app = document.getElementById('app');
-  app.innerHTML = '';
+  app.replaceChildren();
 
   const mapDiv = el('div', { id: 'map' });
 
@@ -508,7 +514,7 @@ export function renderAppShell({ onSearch, onToggleVisibility, onOpenFriends, on
   const hud = el(
     'header',
     { class: 'hud' },
-    el('div', { class: 'logo-small logo', innerHTML: 'TEMAN<span>PETA</span>' }),
+    el('div', { class: 'logo-small logo' }, 'TEMAN', el('span', {}, 'PETA')),
     hudSearch,
     el(
       'div',
@@ -529,7 +535,7 @@ export function renderAppShell({ onSearch, onToggleVisibility, onOpenFriends, on
   app.append(el('div', { class: 'screen-app' }, mapDiv, hud, panel, chatRoot));
 
   function setMe(me) {
-    chip.innerHTML = '';
+    chip.replaceChildren();
     chip.append(
       el('span', { class: 'nick', text: me.nickname }),
       el('span', { class: 'pid', text: me.publicId }),
@@ -573,7 +579,7 @@ export function renderAppShell({ onSearch, onToggleVisibility, onOpenFriends, on
 }
 
 export function setSearchResults(drop, groups) {
-  drop.innerHTML = '';
+  drop.replaceChildren();
   let total = 0;
   for (const g of groups) {
     if (g.items.length === 0) continue;
@@ -602,7 +608,7 @@ export function setSearchResults(drop, groups) {
 
 function panelFrame(panel, title, onClose) {
   panel.classList.remove('hidden');
-  panel.innerHTML = '';
+  panel.replaceChildren();
   panel.append(
     el(
       'div',

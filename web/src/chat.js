@@ -60,7 +60,7 @@ export function createChat(root, { onTyping, onOpenProfile, onSeen }) {
     el(
       'div',
       { class: 'chat-head' },
-      el('div', { style: 'flex:1;min-width:0' }, headTitle, headId),
+      el('div', { class: 'chat-head-main' }, headTitle, headId),
       btnProfile,
       btnClose,
     ),
@@ -87,7 +87,7 @@ export function createChat(root, { onTyping, onOpenProfile, onSeen }) {
     root.classList.remove('hidden');
     headTitle.textContent = user.nickname;
     headId.textContent = user.publicId;
-    msgs.innerHTML = '';
+    msgs.replaceChildren();
     oldestId = null;
     btnMore.remove();
     typingLine.textContent = '';

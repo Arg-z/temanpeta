@@ -1,19 +1,23 @@
 import { WebSocketServer } from 'ws';
 import { query } from './db.js';
 import { getRegion } from './regions.js';
-import { SESSION_COOKIE } from './auth.js';
+import { sessionTokenFromCookie } from './auth.js';
+import { hashToken } from './util.js';
 
 // Koneksi aktif per userId (satu pengguna bisa buka beberapa tab).
 const online = new Map();
+// Batas koneksi bersamaan per pengguna — mencegah resource exhaustion
+// lewat pembukaan socket sebanyak-banyaknya dengan satu sesi (CWE-770).
+const MAX_SOCKETS_PER_USER = 5;
+// Handshake bersamaan di seluruh proses: tiap handshake menelan satu query
+// DB sebelum terbukti sah, jadi banjir handshake harus dibatasi sejak awal.
+const MAX_PENDING_HANDSHAKES = 100;
+let pendingHandshakes = 0;
 
 // Baca cookie sesi dari header Upgrade — token TIDAK lagi lewat query string.
+// Validasi lewat allowlist hex di auth.js: input malformed ditolak aman.
 function sessionTokenFromReq(req) {
-  const header = req.headers.cookie ?? '';
-  const match = header
-    .split(';')
-    .map((c) => c.trim())
-    .find((c) => c.startsWith(`${SESSION_COOKIE}=`));
-  return match ? decodeURIComponent(match.slice(SESSION_COOKIE.length + 1)) : null;
+  return sessionTokenFromCookie(req.headers.cookie);
 }
 
 function send(ws, event) {
@@ -66,118 +70,153 @@ export function initWs(httpServer) {
   });
 
   wss.on('connection', async (ws, req) => {
-    // Cegah koneksi lintas origin (aplikasi hanya melayani origin sendiri).
-    if (req.headers.origin) {
-      try {
-        if (new URL(req.headers.origin).host !== req.headers.host) {
-          ws.close(4003, 'origin ditolak');
-          return;
-        }
-      } catch {
-        ws.close(4003, 'origin tidak valid');
-        return;
-      }
-    }
-
-    // Sesi dibaca dari cookie HttpOnly — token tidak lagi lewat query string.
-    const token = sessionTokenFromReq(req);
-    const { rows } = await query(
-      `SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
-       WHERE s.token = $1 AND s.expires_at > now()`,
-      [token ?? ''],
-    );
-    if (rows.length === 0 || rows[0].banned) {
-      ws.close(4001, 'unauthorized');
+    // Listener async ws tidak diproses EventEmitter — rejection yang lolos
+    // menjadi unhandledRejection dan menjatuhkan proses. Semua jalur
+    // dibungkus try/catch (CWE-248).
+    if (pendingHandshakes >= MAX_PENDING_HANDSHAKES) {
+      ws.close(4008, 'terlalu banyak koneksi');
       return;
     }
-    const user = rows[0];
-
-    // Pembatas laju pesan per koneksi: typing hanya butuh sedikit bandwidth.
-    let msgTimes = [];
-
-    let set = online.get(user.id);
-    if (!set) online.set(user.id, (set = new Set()));
-    set.add(ws);
-    if (set.size === 1) {
-      await notifyFriends(user.id, {
-        type: 'friend.online',
-        publicId: user.public_id,
-      });
-      // Kehadiran pengguna bervisibilitas nyala diumumkan ke semua koneksi
-      // (dipakai frontend untuk menampilkan/menghilangkan titik peta realtime).
-      // Ikutkan nickname + centroid wilayah agar titik langsung bisa digambar.
-      if (user.visibility) {
-        const reg = user.region_code ? getRegion(user.region_code) : null;
-        broadcastOthers(user.id, {
-          type: 'user.online',
-          publicId: user.public_id,
-          nickname: user.nickname,
-          lat: reg?.lat ?? null,
-          lng: reg?.lng ?? null,
-        });
-      }
-    }
-
-    ws.isAlive = true;
-    ws.on('pong', () => {
-      ws.isAlive = true;
-    });
-
-    ws.on('message', async (raw) => {
-      // Banjir pesan: lebih dari 40 pesan / 10 detik → tutup koneksi.
-      const nowMs = Date.now();
-      msgTimes = msgTimes.filter((t) => nowMs - t < 10_000);
-      msgTimes.push(nowMs);
-      if (msgTimes.length > 40) {
-        ws.close(4008, 'terlalu banyak pesan');
-        return;
-      }
-      let msg;
-      try {
-        msg = JSON.parse(String(raw));
-      } catch {
-        return;
-      }
-      // Indikator mengetik: diteruskan ke penerima bila memang berteman.
-      if (msg.type === 'typing' && typeof msg.to === 'string') {
-        const { rows: friend } = await query(
-          `SELECT 1 FROM friendships
-           WHERE (user_low, user_high) IN (
-             SELECT LEAST($1, u.id), GREATEST($1, u.id)
-             FROM users u WHERE u.public_id = $2
-           )`,
-          [user.id, msg.to.slice(0, 8)],
-        );
-        if (friend.length > 0) {
-          const { rows: target } = await query('SELECT id FROM users WHERE public_id = $1', [
-            msg.to.slice(0, 8),
-          ]);
-          if (target.length > 0) publish(target[0].id, { type: 'typing', from: user.public_id });
-        }
-      }
-    });
-
-    ws.on('close', async () => {
-      const s = online.get(user.id);
-      if (s) {
-        s.delete(ws);
-        if (s.size === 0) {
-          online.delete(user.id);
-          await notifyFriends(user.id, {
-            type: 'friend.offline',
-            publicId: user.public_id,
-          });
-          // Baca ulang visibilitas — bisa saja berubah selama sesi berjalan.
-          const { rows: fresh } = await query(
-            'SELECT visibility FROM users WHERE id = $1',
-            [user.id],
-          );
-          if (fresh[0]?.visibility) {
-            broadcastOthers(user.id, { type: 'user.offline', publicId: user.public_id });
+    pendingHandshakes += 1;
+    try {
+      // Cegah koneksi lintas origin (aplikasi hanya melayani origin sendiri).
+      if (req.headers.origin) {
+        try {
+          if (new URL(req.headers.origin).host !== req.headers.host) {
+            ws.close(4003, 'origin ditolak');
+            return;
           }
+        } catch {
+          ws.close(4003, 'origin tidak valid');
+          return;
         }
       }
-    });
+
+      // Sesi dibaca dari cookie HttpOnly — token tidak lagi lewat query string.
+      const token = sessionTokenFromReq(req);
+      if (!token) {
+        ws.close(4001, 'unauthorized');
+        return;
+      }
+      const { rows } = await query(
+        `SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE (s.token = $1 OR s.token = $2) AND s.expires_at > now()`,
+        [hashToken(token), token],
+      );
+      if (rows.length === 0 || rows[0].banned) {
+        ws.close(4001, 'unauthorized');
+        return;
+      }
+      const user = rows[0];
+
+      // Pembatas laju pesan per koneksi: typing hanya butuh sedikit bandwidth.
+      let msgTimes = [];
+
+      let set = online.get(user.id);
+      if (!set) online.set(user.id, (set = new Set()));
+      if (set.size >= MAX_SOCKETS_PER_USER) {
+        ws.close(4008, 'terlalu banyak koneksi');
+        return;
+      }
+      set.add(ws);
+
+      if (set.size === 1) {
+        await notifyFriends(user.id, {
+          type: 'friend.online',
+          publicId: user.public_id,
+        });
+        // Kehadiran pengguna bervisibilitas nyala diumumkan ke semua koneksi
+        // (dipakai frontend untuk menampilkan/menghilangkan titik peta realtime).
+        // Ikutkan nickname + centroid wilayah agar titik langsung bisa digambar.
+        if (user.visibility) {
+          const reg = user.region_code ? getRegion(user.region_code) : null;
+          broadcastOthers(user.id, {
+            type: 'user.online',
+            publicId: user.public_id,
+            nickname: user.nickname,
+            lat: reg?.lat ?? null,
+            lng: reg?.lng ?? null,
+          });
+        }
+      }
+
+      ws.isAlive = true;
+      ws.on('pong', () => {
+        ws.isAlive = true;
+      });
+
+      ws.on('message', async (raw) => {
+        try {
+          // Banjir pesan: lebih dari 40 pesan / 10 detik → tutup koneksi.
+          const nowMs = Date.now();
+          msgTimes = msgTimes.filter((t) => nowMs - t < 10_000);
+          msgTimes.push(nowMs);
+          if (msgTimes.length > 40) {
+            ws.close(4008, 'terlalu banyak pesan');
+            return;
+          }
+          let msg;
+          try {
+            msg = JSON.parse(String(raw));
+          } catch {
+            return;
+          }
+          // Indikator mengetik: diteruskan ke penerima bila memang berteman.
+          if (msg.type === 'typing' && typeof msg.to === 'string') {
+            const { rows: friend } = await query(
+              `SELECT 1 FROM friendships
+               WHERE (user_low, user_high) IN (
+                 SELECT LEAST($1, u.id), GREATEST($1, u.id)
+                 FROM users u WHERE u.public_id = $2
+               )`,
+              [user.id, msg.to.slice(0, 8)],
+            );
+            if (friend.length > 0) {
+              const { rows: target } = await query('SELECT id FROM users WHERE public_id = $1', [
+                msg.to.slice(0, 8),
+              ]);
+              if (target.length > 0) publish(target[0].id, { type: 'typing', from: user.public_id });
+            }
+          }
+        } catch (err) {
+          console.error('WS message error:', err.message);
+        }
+      });
+
+      ws.on('close', async () => {
+        try {
+          const s = online.get(user.id);
+          if (s) {
+            s.delete(ws);
+            if (s.size === 0) {
+              online.delete(user.id);
+              await notifyFriends(user.id, {
+                type: 'friend.offline',
+                publicId: user.public_id,
+              });
+              // Baca ulang visibilitas — bisa saja berubah selama sesi berjalan.
+              const { rows: fresh } = await query('SELECT visibility FROM users WHERE id = $1', [
+                user.id,
+              ]);
+              if (fresh[0]?.visibility) {
+                broadcastOthers(user.id, { type: 'user.offline', publicId: user.public_id });
+              }
+            }
+          }
+        } catch (err) {
+          console.error('WS close error:', err.message);
+        }
+      });
+    } catch (err) {
+      console.error('WS connection error:', err.message);
+      try {
+        ws.close(1011, 'server error');
+      } catch {
+        // koneksi sudah tertutup
+      }
+    } finally {
+      pendingHandshakes -= 1;
+    }
   });
 
   // Bersihkan koneksi mati + tutup koneksi tanpa sesi valid setiap 30 detik
