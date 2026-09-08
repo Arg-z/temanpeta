@@ -124,9 +124,9 @@ export function renderAuth({ onLogin, onRegister }) {
     id: 'f-pass',
     type: 'password',
     autocomplete: 'current-password',
-    placeholder: 'min. 6 karakter',
+    placeholder: 'min. 8 karakter',
     required: 'required',
-    minlength: '6',
+    minlength: '8',
     'aria-describedby': 'err-f-pass',
   });
   const fieldNick = el('input', {
@@ -233,7 +233,7 @@ export function renderAuth({ onLogin, onRegister }) {
     };
     if (!loginId) return salah(fieldLogin, errLogin, 'ID login masih kosong — isi dulu ya.');
     if (!password) return salah(fieldPass, errPass, 'Password masih kosong — isi dulu ya.');
-    if (password.length < 6) return salah(fieldPass, errPass, 'Password minimal 6 karakter.');
+    if (password.length < 8) return salah(fieldPass, errPass, 'Password minimal 8 karakter.');
     if (mode === 'register' && !nickname) return salah(fieldNick, errNick, 'Nickname masih kosong — isi dulu ya.');
     if (mode === 'register' && nickname.length < 2) return salah(fieldNick, errNick, 'Nickname minimal 2 karakter.');
 
