@@ -10,17 +10,19 @@ Tampilan bertema 8-bit tenang: navy, krem, teal, amber. Peta adalah fokus utama.
 ## Arsitektur
 
 ```text
-Domain + HTTPS (Caddy, otomatis Let's Encrypt)
-      ↓
-Caddy  ── static file hasil build Vite (SPA)
-      ↓  /api/* dan /ws
-Backend Node.js (Express + ws)
-      ↓
-PostgreSQL
+nginx (host) — TLS untuk connext.web.id + app.connext.web.id (certbot)
+      ├─ connext.web.id      → landing/ (statis, tanpa build)
+      └─ app.connext.web.id  → Caddy (container, 127.0.0.1:8088)
+                                 ├─ static file hasil build Vite (SPA)
+                                 └─ /api/* dan /ws → Backend Node.js (Express + ws)
+                                                       ↓
+                                                  PostgreSQL
 ```
 
 - `server/` — REST API, WebSocket, skema DB, data wilayah 38 provinsi + 514 kab/kota.
 - `web/` — frontend vanilla JS + MapLibre (tanpa framework), tema 8-bit.
+- `landing/` — landing page publik di `connext.web.id`, dilayani nginx langsung dari folder ini (edit = langsung live, tanpa build). CTA-nya mengarah ke `app.connext.web.id`.
+- `deploy/` — config nginx, skrip setup HTTPS, dan skrip pemisahan landing/app (`setup-split.sh`).
 - `docs/API.md` — kontrak lengkap REST + WebSocket (untuk frontend alternatif/AI).
 
 ## Menjalankan untuk development (tanpa Docker)

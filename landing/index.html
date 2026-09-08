@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TemanPeta — Ngobrol 1-lawan-1 se-wilayah di peta Indonesia</title>
+<meta name="description" content="TemanPeta: aplikasi chat pribadi 1-lawan-1 berbasis wilayah di Indonesia. Daftar dengan ID bebas, dapat ID publik 8 karakter, temukan orang lewat peta 38 provinsi & 514 kabupaten/kota, tanpa grup dan tanpa GPS presisi." />
+<meta name="theme-color" content="#101a2e" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23101a2e'/><rect x='6' y='6' width='88' height='88' fill='none' stroke='%233fc1b0' stroke-width='6'/><rect x='22' y='34' width='56' height='6' fill='%23e9a94e'/><rect x='22' y='46' width='40' height='6' fill='%23f0e6d2'/><rect x='22' y='58' width='48' height='6' fill='%233fc1b0'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   TemanPeta Landing — desain editorial premium + identitas 8-bit
+   Palet asli app: navy / krem / teal / amber
+   ============================================================ */
+:root {
+  --bg: #101a2e;
+  --bg-2: #182338;
+  --bg-3: #223050;
+  --ink: #0b1220;
+  --line: #2c3a5c;
+  --cream: #f0e6d2;
+  --cream-dim: #a89d88;
+  --teal: #3fc1b0;
+  --teal-dark: #2a8f83;
+  --amber: #e9a94e;
+  --red: #d96459;
+  --green: #7bc96f;
+  --font-pixel: 'Press Start 2P', monospace;
+  --font-body: 'VT323', monospace;
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-size: 20px;
+  line-height: 1.55;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--teal); text-decoration: none; }
+a:hover { color: var(--amber); }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+/* ---------- pixel scanline overlay ---------- */
+.scanlines {
+  position: fixed; inset: 0; pointer-events: none; z-index: 60;
+  background: repeating-linear-gradient(
+    0deg, rgba(0,0,0,0.09) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay; opacity: .4;
+}
+
+/* ---------- nav ---------- */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  background: rgba(16,26,46,.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.nav-in {
+  max-width: 1240px; margin: 0 auto; padding: 16px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.brand {
+  font-family: var(--font-pixel); font-size: 13px; color: var(--teal); letter-spacing: .5px;
+  display: flex; align-items: center; gap: 10px;
+}
+.brand .dot { width: 10px; height: 10px; background: var(--amber); display: inline-block; box-shadow: 2px 2px 0 rgba(0,0,0,.5); }
+.brand b { color: var(--amber); font-weight: normal; }
+.nav-links { display: flex; gap: 28px; align-items: center; }
+.nav-links a { color: var(--cream-dim); font-size: 18px; }
+.nav-links a:hover { color: var(--cream); }
+.nav-cta {
+  font-family: var(--font-pixel); font-size: 10px;
+  background: var(--teal); color: var(--ink);
+  padding: 11px 16px; border: 2px solid var(--teal);
+  box-shadow: 3px 3px 0 rgba(0,0,0,.4);
+}
+.nav-cta:hover { background: var(--amber); border-color: var(--amber); color: var(--ink); }
+
+/* ---------- buttons ---------- */
+.btn {
+  font-family: var(--font-pixel); font-size: 11px;
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 16px 22px; cursor: pointer; border: 2px solid;
+  transition: transform .1s ease, filter .15s;
+  letter-spacing: .5px;
+}
+.btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 rgba(0,0,0,.4) !important; }
+.btn-primary { background: var(--teal); border-color: var(--teal); color: var(--ink); box-shadow: 5px 5px 0 var(--amber); padding-right: 26px; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-amber { background: var(--amber); border-color: var(--amber); color: var(--ink); box-shadow: 5px 5px 0 rgba(0,0,0,.4); }
+.btn-amber:hover { filter: brightness(1.08); }
+.btn-ghost { background: transparent; border-color: var(--line); color: var(--cream); }
+.btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+
+/* ---------- hero ---------- */
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center;
+  padding: 140px 0 80px; position: relative; overflow: hidden;
+}
+/* animated pixel-grid background (parallax driven by JS) */
+.pixel-bg {
+  position: absolute; inset: -20%; z-index: 0; opacity: .5;
+  background-image:
+    linear-gradient(rgba(63,193,176,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63,193,176,.08) 1px, transparent 1px);
+  background-size: 44px 44px;
+  transform: translateZ(0);
+}
+.hero-glow {
+  position: absolute; width: 560px; height: 560px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(63,193,176,.16), transparent 70%);
+  top: -100px; right: -120px; filter: blur(8px); z-index: 0;
+}
+.hero-in { position: relative; z-index: 2; display: grid; grid-template-columns: 1.05fr .95fr; gap: 60px; align-items: center; }
+.kicker {
+  font-family: var(--font-pixel); font-size: 10px; color: var(--amber);
+  letter-spacing: 2px; margin-bottom: 26px; display: flex; align-items: center; gap: 12px;
+}
+.kicker::before { content: ''; width: 34px; height: 3px; background: var(--amber); display: inline-block; }
+h1 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: clamp(38px, 5.2vw, 64px);
+  line-height: 1.06; letter-spacing: -.02em;
+  margin-bottom: 26px;
+}
+h1 .pixel {
+  font-family: var(--font-pixel); font-size: .58em; color: var(--teal);
+  vertical-align: middle; white-space: nowrap;
+}
+h1 .acc-teal { color: var(--teal); }
+h1 .acc-amber { color: var(--amber); }
+.hero-sub {
+  color: var(--cream-dim); font-size: 24px; max-width: 520px; margin-bottom: 38px;
+}
+.hero-cta { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 48px; }
+.hero-stats { display: flex; gap: 40px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 26px; }
+.stat .num { font-family: var(--font-sans); font-weight: 700; font-size: 34px; color: var(--cream); }
+.stat .num em { font-style: normal; color: var(--teal); }
+.stat .lbl { font-family: var(--font-pixel); font-size: 8px; color: var(--cream-dim); letter-spacing: 1px; margin-top: 8px; }
+
+/* ---------- hero: map card visual ---------- */
+.mapvisual {
+  position: relative; z-index: 2;
+  background: var(--bg-2); border: 2px solid var(--line);
+  box-shadow: 12px 12px 0 rgba(0,0,0,.35); padding: 22px;
+}
+.mapvisual .mv-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.mapvisual .mv-title { font-family: var(--font-pixel); font-size: 9px; color: var(--teal); }
+.mapvisual .mv-live { font-family: var(--font-pixel); font-size: 8px; color: var(--green); display: flex; align-items: center; gap: 6px; }
+.blink { width: 8px; height: 8px; background: var(--green); border-radius: 50%; animation: blink 1.2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+#indmap { width: 100%; height: auto; display: block; }
+.mapvisual .mv-foot { margin-top: 14px; display: flex; justify-content: space-between; color: var(--cream-dim); font-size: 16px; font-family: var(--font-pixel); font-size: 8px; letter-spacing: 1px; }
+.mapvisual .mv-foot span:nth-child(2){ color: var(--teal); }
+
+.mv-badge {
+  position: absolute; top: -14px; right: 24px;
+  background: var(--amber); color: var(--ink);
+  font-family: var(--font-pixel); font-size: 8px; padding: 8px 12px;
+  box-shadow: 3px 3px 0 rgba(0,0,0,.4); letter-spacing: 1px;
+}
+
+/* ---------- sections ---------- */
+section { position: relative; }
+.sec-pad { padding: 110px 0; }
+.sec-in { position: relative; z-index: 2; }
+.sec-cent { text-align: center; }
+.sec-tag {
+  font-family: var(--font-pixel); font-size: 9px; color: var(--teal);
+  letter-spacing: 2px; margin-bottom: 18px; display: flex; align-items: center; gap: 12px;
+}
+.sec-cent .sec-tag { justify-content: center; }
+.sec-tag::after { content: ''; height: 1px; background: var(--line); flex: 1; }
+.sec-cent .sec-tag::after { flex: 0 0 60px; }
+.sec-head { font-family: var(--font-sans); font-weight: 700; font-size: clamp(26px, 3.2vw, 42px); line-height: 1.15; letter-spacing: -.01em; margin-bottom: 20px; }
+.sec-sub { color: var(--cream-dim); font-size: 22px; max-width: 640px; }
+.sec-cent .sec-sub { margin: 0 auto; }
+.sec-tag-flat::after { display: none; }
+
+/* ---------- alternating dark band ---------- */
+.dark-band { background: linear-gradient(180deg, var(--bg) 0%, #0d1524 50%, var(--bg) 100%); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+
+/* ---------- feature cards ---------- */
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 50px; }
+.fcard {
+  background: var(--bg-2); border: 2px solid var(--line);
+  padding: 30px 26px; position: relative; transition: transform .15s ease, border-color .2s;
+}
+.fcard:hover { transform: translateY(-6px); border-color: var(--teal); }
+.fcard .ficon { font-size: 34px; margin-bottom: 20px; }
+.fcard h3 { font-family: var(--font-sans); font-weight: 600; font-size: 20px; color: var(--cream); margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+.fcard h3 .n { font-family: var(--font-pixel); font-size: 8px; color: var(--teal); border: 1px solid var(--line); padding: 5px 7px; }
+.fcard p { color: var(--cream-dim); font-size: 19px; }
+.fcard .chip-row { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { font-family: var(--font-pixel); font-size: 7px; color: var(--teal); border: 1px solid var(--teal-dark); padding: 5px 8px; letter-spacing: .5px; }
+
+/* ---------- how it works (timeline) ---------- */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 50px; counter-reset: step; }
+.step {
+  position: relative; background: var(--bg-2); border: 2px solid var(--line);
+  padding: 34px 26px 28px;
+}
+.step::before {
+  counter-increment: step; content: "0" counter(step);
+  font-family: var(--font-pixel); font-size: 20px; color: var(--amber);
+  position: absolute; top: 22px; right: 22px; opacity: .9;
+}
+.step .sicon { font-size: 32px; margin-bottom: 18px; }
+.step h3 { font-family: var(--font-sans); font-weight: 600; font-size: 19px; color: var(--cream); margin-bottom: 12px; }
+.step p { color: var(--cream-dim); font-size: 18px; }
+.step .arrow { margin-top: 18px; font-size: 22px; color: var(--teal); }
+
+/* ---------- privacy / feature split ---------- */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; margin-top: 40px; }
+.split-h { font-family: var(--font-sans); font-weight: 700; font-size: clamp(24px, 2.6vw, 34px); margin-bottom: 22px; color: var(--cream); }
+.split-h .acc { color: var(--teal); }
+.split ul { list-style: none; }
+.split li { padding: 14px 0 14px 36px; position: relative; color: var(--cream-dim); font-size: 21px; border-bottom: 1px solid var(--line); }
+.split li:last-child { border-bottom: none; }
+.split li::before { content: '▸'; position: absolute; left: 0; color: var(--teal); font-size: 22px; }
+.split li b { color: var(--cream); font-weight: normal; }
+
+.code-card {
+  background: var(--ink); border: 2px solid var(--line);
+  padding: 24px; font-family: 'VT323', monospace; font-size: 18px;
+  box-shadow: 8px 8px 0 rgba(0,0,0,.35); position: relative;
+}
+.code-card .cc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 13px; color: var(--cream-dim); }
+.code-card .dots { display: flex; gap: 6px; }
+.code-card .dots i { width: 10px; height: 10px; display: inline-block; border-radius: 50%; }
+.code-card pre { color: var(--cream); line-height: 1.7; overflow-x: auto; }
+.code-card .t { color: var(--teal); }
+.code-card .a { color: var(--amber); }
+.code-card .g { color: var(--green); }
+
+/* ---------- CTA ---------- */
+.cta-band {
+  position: relative; text-align: center; padding: 120px 0; overflow: hidden;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+}
+.cta-band h2 { font-family: var(--font-sans); font-weight: 700; font-size: clamp(28px, 3.6vw, 46px); color: var(--cream); margin-bottom: 16px; }
+.cta-band h2 .pixel { font-family: var(--font-pixel); font-size: .5em; color: var(--teal); }
+.cta-band p { color: var(--cream-dim); font-size: 22px; max-width: 540px; margin: 0 auto 40px; }
+.cta-btn-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+
+/* ---------- footer ---------- */
+footer { border-top: 1px solid var(--line); padding: 50px 0 60px; background: var(--ink); }
+.foot-in { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 40px; }
+.foot-brand p { color: var(--cream-dim); font-size: 18px; margin-top: 12px; max-width: 300px; }
+.foot-col h4 { font-family: var(--font-pixel); font-size: 9px; color: var(--amber); margin-bottom: 18px; letter-spacing: 1px; }
+.foot-col a { display: block; color: var(--cream-dim); font-size: 18px; margin-bottom: 10px; }
+.foot-col a:hover { color: var(--teal); }
+.foot-bottom { margin-top: 46px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--cream-dim); font-family: var(--font-pixel); font-size: 8px; letter-spacing: 1px; }
+
+/* ---------- reveal on scroll ---------- */
+.reveal { opacity: 0; transform: translateY(26px); transition: opacity .6s ease, transform .6s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 960px) {
+  .hero-in { grid-template-columns: 1fr; gap: 50px; }
+  .features, .steps { grid-template-columns: 1fr 1fr; }
+  .split { grid-template-columns: 1fr; gap: 44px; }
+  .foot-in { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .nav-links { display: none; }
+  .features, .steps { grid-template-columns: 1fr; }
+  .hero { padding-top: 120px; }
+  .hero-stats { gap: 24px; }
+  .foot-in { grid-template-columns: 1fr; }
+  .foot-bottom { flex-direction: column; gap: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+
+<!-- ================= NAV ================= -->
+<nav>
+  <div class="nav-in">
+    <a class="brand" href="#"><span class="dot"></span>Teman<b>Peta</b></a>
+    <div class="nav-links">
+      <a href="#fitur">Fitur</a>
+      <a href="#cara">Cara Kerja</a>
+      <a href="#privasi">Privasi</a>
+      <a href="#teknis">Teknis</a>
+      <a class="btn nav-cta" href="https://app.connext.web.id" target="_blank" rel="noopener">MASUK APP ▸</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero" id="top">
+  <div class="pixel-bg" id="pixelbg"></div>
+  <div class="hero-glow"></div>
+  <div class="wrap hero-in">
+    <div>
+      <div class="kicker">SOCIAL MAP CHAT</div>
+      <h1>
+        Ngobrol <span class="pixel">1-lawan-1</span><br/>
+        dengan tetangga <span class="acc-teal">se-wilayah</span><br/>
+        kamu, di <span class="acc-amber">peta</span>.
+      </h1>
+      <p class="hero-sub">
+        TemanPeta menghubungkan kamu dengan orang di sekitarmu. Daftar pake ID bebas,
+        dapat ID publik 8 karakter, terus langsung ngobrol. Nggak ada grup, nggak ada GPS presisi.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://app.connext.web.id" target="_blank" rel="noopener">MULAI NGOPI ▸</a>
+        <a class="btn btn-ghost" href="#cara">Lihat cara kerja</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><div class="num"><em class="count" data-target="38">0</em></div><div class="lbl">PROVINSI</div></div>
+        <div class="stat"><div class="num"><em class="count" data-target="514">0</em></div><div class="lbl">KAB/KOTA</div></div>
+        <div class="stat"><div class="num"><em class="count" data-target="8">0</em></div><div class="lbl">ID PUBLIK</div></div>
+      </div>
+    </div>
+
+    <div class="mapvisual" id="mapbox">
+      <div class="mv-badge">● LIVE</div>
+      <div class="mv-head">
+        <div class="mv-title">PETA INDONESIA</div>
+        <div class="mv-live"><span class="blink"></span> REALTIME</div>
+      </div>
+      <svg id="indmap" viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg">
+        <!-- Pulau-pulau pixelated Indonesia: Sumatra, Jawa, Kalimantan, Sulawesi, Papua, Nusa -->
+        <g fill="#223050" stroke="#2c3a5c" stroke-width="1.5" shape-rendering="crispEdges">
+          <rect x="40" y="28" width="14" height="10"/><rect x="34" y="38" width="20" height="10"/>
+          <rect x="40" y="48" width="14" height="10"/><rect x="38" y="28" width="6" height="10"/>
+          <rect x="30" y="52" width="10" height="6"/><rect x="34" y="22" width="10" height="6"/>
+          <rect x="128" y="96" width="16" height="10"/><rect x="118" y="106" width="12" height="8"/>
+          <rect x="122" y="88" width="14" height="8"/><rect x="116" y="114" width="10" height="6"/>
+          <rect x="136" y="100" width="12" height="8"/><rect x="130" y="104" width="8" height="8"/>
+          <rect x="196" y="62" width="16" height="12"/><rect x="188" y="50" width="18" height="12"/>
+          <rect x="204" y="74" width="14" height="10"/><rect x="178" y="58" width="12" height="10"/>
+          <rect x="214" y="58" width="12" height="10"/><rect x="200" y="84" width="10" height="8"/>
+          <rect x="232" y="46" width="14" height="12"/><rect x="228" y="34" width="16" height="12"/>
+          <rect x="216" y="40" width="12" height="6"/><rect x="244" y="58" width="12" height="8"/>
+          <rect x="238" y="66" width="10" height="6"/><rect x="226" y="78" width="10" height="6"/>
+          <rect x="338" y="120" width="20" height="12"/><rect x="332" y="132" width="16" height="10"/>
+          <rect x="352" y="126" width="14" height="10"/><rect x="330" y="144" width="14" height="8"/>
+          <rect x="360" y="96" width="12" height="10"/><rect x="356" y="108" width="10" height="8"/>
+          <rect x="368" y="84" width="10" height="10"/><rect x="386" y="66" width="14" height="12"/>
+        </g>
+        <!-- Pulsa titik online -->
+        <g>
+          <circle cx="52" cy="42" r="4" fill="#3fc1b0" class="pulse"/>
+          <circle cx="132" cy="104" r="4" fill="#e9a94e" class="pulse" style="animation-delay:.4s"/>
+          <circle cx="206" cy="64" r="4" fill="#3fc1b0" class="pulse" style="animation-delay:.8s"/>
+          <circle cx="236" cy="50" r="4" fill="#e9a94e" class="pulse" style="animation-delay:1.2s"/>
+          <circle cx="352" cy="130" r="4" fill="#3fc1b0" class="pulse" style="animation-delay:.6s"/>
+          <circle cx="382" cy="72" r="4" fill="#e9a94e" class="pulse" style="animation-delay:1s"/>
+        </g>
+      </svg>
+      <style>
+        .pulse { transform-box: fill-box; transform-origin: center; animation: pr 2s infinite; }
+        @keyframes pr { 0%{ r: 3; opacity:.2 } 20%{ opacity:1 } 100%{ r: 7; opacity:0 } }
+      </style>
+      <div class="mv-foot">
+        <span>3 LANGKAH</span><span>38 PROVINSI</span><span class="status" id="mvlive">TERHUBUNG</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ================= FEATURES ================= -->
+<section id="fitur" class="sec-pad">
+  <div class="wrap sec-in">
+    <div class="sec-tag">// 01 — FITUR</div>
+    <h2 class="sec-head">Satu aplikasi, enam cara<br/>nyambung sama orang</h2>
+    <p class="sec-sub">Dibangun dari nol: privasi dijaga, cepat, dan koneksinya antar-manusia beneran.</p>
+    <div class="features">
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="4" y="6" width="24" height="20" fill="#3fc1b0" opacity=".22"/><rect x="4" y="6" width="7" height="5" fill="#3fc1b0"/><rect x="13" y="6" width="5" height="5" fill="#3fc1b0"/><rect x="20" y="6" width="8" height="5" fill="#e9a94e"/><rect x="4" y="13" width="7" height="5" fill="#e9a94e"/><rect x="13" y="13" width="8" height="5" fill="#3fc1b0"/><rect x="4" y="20" width="11" height="5" fill="#3fc1b0"/><rect x="18" y="20" width="10" height="5" fill="#e9a94e"/></svg></div>
+        <h3><span class="n">01</span>Peta Interaktif</h3>
+        <p>Jelajahi orang lewat peta Indonesia lengkap: 38 provinsi dan 514 kabupaten/kota. Cari teman berdasarkan wilayah, bukan lokasi presisimu.</p>
+        <div class="chip-row"><span class="chip">MAPLIBRE</span><span class="chip">38 PROV</span><span class="chip">REAL-TIME</span></div>
+      </div>
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="4" y="4" width="24" height="18" fill="#3fc1b0" opacity=".22"/><rect x="4" y="4" width="24" height="4" fill="#3fc1b0"/><rect x="8" y="12" width="6" height="3" fill="#e9a94e"/><rect x="16" y="12" width="8" height="3" fill="#e9a94e"/><rect x="8" y="17" width="12" height="3" fill="#3fc1b0"/><rect x="10" y="22" width="12" height="6" fill="#3fc1b0"/></svg></div>
+        <h3><span class="n">02</span>Chat 1-lawan-1</h3>
+        <p>Percakapan pribadi antara dua orang, terkirim instan lewat WebSocket. Nggak ada grup, nggak ada berisik.</p>
+        <div class="chip-row"><span class="chip">WEBSOCKET</span><span class="chip">PRIVAT</span><span class="chip">REALTIME</span></div>
+      </div>
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="3" y="7" width="26" height="18" fill="#3fc1b0" opacity=".22"/><rect x="3" y="7" width="26" height="4" fill="#3fc1b0"/><rect x="7" y="15" width="8" height="4" fill="#e9a94e"/><rect x="18" y="15" width="7" height="4" fill="#e9a94e"/><rect x="7" y="21" width="14" height="3" fill="#3fc1b0"/></svg></div>
+        <h3><span class="n">03</span>ID Publik 8 Karakter</h3>
+        <p>Server kasih kamu ID acak 8 karakter buat dicari orang lain. Mau dibagikan atau nggak, terserah kamu.</p>
+        <div class="chip-row"><span class="chip">ID LOGIN PRIVAT</span><span class="chip">ID PUBLIK</span><span class="chip">NICKNAME</span></div>
+      </div>
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="9" y="4" width="14" height="5" fill="#3fc1b0"/><rect x="6" y="9" width="20" height="5" fill="#3fc1b0"/><rect x="6" y="14" width="20" height="14" fill="#3fc1b0" opacity=".22"/><rect x="6" y="14" width="20" height="4" fill="#3fc1b0"/><rect x="12" y="20" width="8" height="4" fill="#e9a94e"/><rect x="14" y="16" width="4" height="4" fill="#3fc1b0"/></svg></div>
+        <h3><span class="n">04</span>Kontrol & Privasi</h3>
+        <p>Blokir pengguna, lapor ke admin, atur visibilitas di peta. Yang disimpan cuma wilayah perkiraan, bukan koordinat presisi.</p>
+        <div class="chip-row"><span class="chip">BLOKIR</span><span class="chip">LAPOR</span><span class="chip">TANPA GPS PRESISI</span></div>
+      </div>
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="20" y="2" width="6" height="10" fill="#e9a94e"/><rect x="14" y="12" width="6" height="8" fill="#e9a94e"/><rect x="8" y="20" width="6" height="10" fill="#e9a94e"/><rect x="14" y="12" width="6" height="8" fill="#3fc1b0"/><rect x="8" y="20" width="6" height="10" fill="#3fc1b0"/></svg></div>
+        <h3><span class="n">05</span>Saling Tampil</h3>
+        <p>Kamu lihat titik orang lain cuma kalau kamu juga tampil. Privasi dua arah, dua-duanya dilindungi.</p>
+        <div class="chip-row"><span class="chip">2-ARAH</span><span class="chip">VISIBILITAS</span></div>
+      </div>
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="10" y="6" width="12" height="8" fill="#3fc1b0"/><rect x="7" y="14" width="18" height="13" fill="#3fc1b0"/><rect x="14" y="17" width="4" height="4" fill="#e9a94e"/><rect x="15" y="21" width="2" height="3" fill="#e9a94e"/></svg></div>
+        <h3><span class="n">06</span>Sesi Aman</h3>
+        <p>Sesi disimpan sebagai cookie HttpOnly, nggak ada token di JavaScript. Rate-limit per-IP dan proteksi anti-DoS di tiap lapisan.</p>
+        <div class="chip-row"><span class="chip">HTTPONLY</span><span class="chip">RATE-LIMIT</span><span class="chip">ANTI-DOS</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section id="cara" class="sec-pad dark-band">
+  <div class="wrap sec-in">
+    <div class="sec-tag sec-tag-flat">// 02 — CARA KERJA</div>
+    <h2 class="sec-head sec-cent">Mulai dalam 3 langkah<br/>sederhana</h2>
+    <p class="sec-sub sec-cent">Dari nol sampai ngobrol dalam hitungan detik. Nggak perlu email atau verifikasi berbelit.</p>
+    <div class="steps">
+      <div class="step reveal">
+        <h3>Daftar</h3>
+        <p>Pilih ID login + password bebas sepuasmu. Nggak perlu email atau data pribadi tambahan.</p>
+        <div class="arrow">▸</div>
+      </div>
+      <div class="step reveal">
+        <h3>Temukan</h3>
+        <p>Cari ID publik 8 karakter orang lain lewat peta Indonesia atau kolom pencarian wilayah/nickname.</p>
+        <div class="arrow">▸</div>
+      </div>
+      <div class="step reveal">
+        <h3>Ngobrol</h3>
+        <p>Kirim permintaan pertemanan, lalu mulai chat 1-lawan-1 real-time begitu diterima.</p>
+        <div class="arrow">✓</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PRIVACY SPLIT ================= -->
+<section id="privasi" class="sec-pad">
+  <div class="wrap sec-in">
+    <div class="sec-tag">// 03 — PRIVASI</div>
+    <div class="split">
+      <div class="reveal">
+        <h2 class="split-h">Privasi dari desain,<br/>bukan <span class="acc">tempelan</span>.</h2>
+        <ul>
+          <li><b>Yang disimpan cuma wilayah perkiraan</b> (kabupaten/kota). Nggak ada koordinat presisi.</li>
+          <li><b>ID login 100% privat</b>. Orang lain mencarimu lewat ID publik, bukan lewat login.</li>
+          <li><b>Visibilitas saling</b>. Kamu lihat titik orang lain kalau kamu juga tampil.</li>
+          <li><b>Sesi HttpOnly</b>, cookie-nya nggak bisa diakses JavaScript. Aman dari XSS.</li>
+          <li><b>Blokir dan lapor</b>. Kamu yang pegang kendali siapa yang bisa menghubungimu.</li>
+          <li><b>Lupa password?</b> Pemulihan akun belum ada, jadi catat ID dan password-mu baik-baik.</li>
+        </ul>
+      </div>
+      <div class="reveal">
+        <div class="code-card">
+          <div class="cc-head">
+            <span>SESSION — aman</span>
+            <span class="dots"><i style="background:#d96459"></i><i style="background:#e9a94e"></i><i style="background:#7bc96f"></i></span>
+          </div>
+          <pre><span class="t">POST</span> /login
+  <span class="a">loginId</span>: "budi_01"      <span class="g">// privat</span>
+  <span class="a">password</span>: "********"    <span class="g">// min. 8</span>
+
+<span class="t">200</span> OK
+  Set-Cookie: <span class="a">session</span>=… <span class="g">; HttpOnly; Secure</span>
+
+→ <span class="a">ID publik</span>: <span class="g">k7tY9pQ2</span>  <span class="g">// 8 karakter, dicari orang</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TECH ================= -->
+<section id="teknis" class="sec-pad dark-band">
+  <div class="wrap sec-in">
+    <div class="sec-tag sec-tag-flat">// 04 — TEKNIS</div>
+    <h2 class="sec-head sec-cent">Dibangun ramping, nggak gembul</h2>
+    <p class="sec-sub sec-cent">Arsitektur minimal, fokus ke yang kepake. Nggak nambah-nambah fitur yang nggak ada gunanya.</p>
+    <div class="features" style="margin-top:46px">
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="3" y="5" width="26" height="17" fill="#3fc1b0" opacity=".22"/><rect x="3" y="5" width="26" height="4" fill="#3fc1b0"/><rect x="7" y="12" width="10" height="4" fill="#e9a94e"/><rect x="13" y="22" width="6" height="3" fill="#3fc1b0"/><rect x="9" y="25" width="14" height="3" fill="#3fc1b0"/></svg></div>
+        <h3>Frontend Vanilla</h3>
+        <p>Tanpa framework. Vanilla JS + MapLibre + DOM murni. Halaman ringan, muat cepat, minim jejak.</p>
+        <div class="chip-row"><span class="chip">VANILLA JS</span></div>
+      </div>
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="13" y="2" width="6" height="7" fill="#3fc1b0"/><rect x="13" y="23" width="6" height="7" fill="#3fc1b0"/><rect x="2" y="13" width="7" height="6" fill="#3fc1b0"/><rect x="23" y="13" width="7" height="6" fill="#3fc1b0"/><rect x="10" y="9" width="12" height="14" fill="#3fc1b0"/><rect x="14" y="13" width="4" height="4" fill="#e9a94e"/></svg></div>
+        <h3>Backend Node</h3>
+        <p>REST API + WebSocket pake Express, handle ribuan koneksi realtime dengan mulus.</p>
+        <div class="chip-row"><span class="chip">EXPRESS</span><span class="chip">WS</span></div>
+      </div>
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="6" y="6" width="20" height="6" fill="#3fc1b0"/><rect x="6" y="12" width="20" height="6" fill="#3fc1b0" opacity=".65"/><rect x="6" y="18" width="20" height="6" fill="#3fc1b0" opacity=".4"/><rect x="12" y="8" width="4" height="3" fill="#e9a94e"/><rect x="12" y="14" width="4" height="3" fill="#e9a94e"/><rect x="12" y="20" width="4" height="3" fill="#e9a94e"/></svg></div>
+        <h3>PostgreSQL</h3>
+        <p>Database relasional yang andal, nyimpen data wilayah 38 provinsi + 514 kab/kota.</p>
+        <div class="chip-row"><span class="chip">POSTGRES</span></div>
+      </div>
+      <div class="fcard reveal">
+        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="10" y="3" width="12" height="6" fill="#3fc1b0"/><rect x="6" y="9" width="20" height="6" fill="#3fc1b0"/><rect x="6" y="15" width="20" height="12" fill="#3fc1b0" opacity=".22"/><rect x="14" y="17" width="4" height="4" fill="#e9a94e"/><rect x="15" y="21" width="2" height="3" fill="#e9a94e"/></svg></div>
+        <h3>Hardening</h3>
+        <p>Rate-limit per-IP, anti-DoS, token di-hash saat disimpan, blokir path sensitif (.env, git, zip) di level server.</p>
+        <div class="chip-row"><span class="chip">ANTI-DOS</span><span class="chip">HASH AT REST</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CTA ================= -->
+<section id="daftar" class="cta-band">
+  <div class="pixel-bg" style="opacity:.3"></div>
+  <div class="wrap" style="position:relative; z-index:2">
+    <div class="sec-tag sec-tag-flat sec-cent" style="justify-content:center">// READY?</div>
+    <h2>Siap ketemu <span class="pixel">temanmu</span></h2>
+    <p>Kamu tinggal beberapa klik lagi dari ngobrol dengan orang di sekitarmu.</p>
+    <div class="cta-btn-row">
+      <a class="btn btn-amber" href="https://app.connext.web.id" target="_blank" rel="noopener">BUKA APP ▸</a>
+      <a class="btn btn-ghost" href="#top">Ke atas ↑</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="wrap">
+    <div class="foot-in">
+      <div class="foot-brand">
+        <a class="brand" href="#"><span class="dot"></span>Teman<b>Peta</b></a>
+        <p>Tanpa grup. Tanpa GPS presisi. Murni chat antar-manusia di peta Indonesia.</p>
+      </div>
+      <div class="foot-col">
+        <h4>PRODUK</h4>
+        <a href="#fitur">Fitur</a>
+        <a href="#cara">Cara Kerja</a>
+        <a href="#privasi">Privasi</a>
+        <a href="#teknis">Teknis</a>
+      </div>
+      <div class="foot-col">
+        <h4>INFO</h4>
+        <a href="https://app.connext.web.id" target="_blank" rel="noopener">Buka App</a>
+        <a href="https://app.connext.web.id/manifest.json" target="_blank" rel="noopener">Manifest</a>
+        <a href="#privasi">Kebijakan Privasi</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 TEMANPETA • CONNEXT.WEB.ID</span>
+      <span>BUILT FOR REAL HUMAN CONNECTION</span>
+    </div>
+  </div>
+</footer>
+
+<script src="landing.js"></script>
+</body>
+</html>
