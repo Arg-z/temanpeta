@@ -1,0 +1,65 @@
+:root {
+  --bg: #101a2e;
+  --bg-2: #182338;
+  --line: #2c3a5c;
+  --cream: #f0e6d2;
+  --cream-dim: #a89d88;
+  --teal: #3fc1b0;
+  --amber: #e9a94e;
+  --font-pixel: 'Press Start 2P', monospace;
+  --font-body: 'VT323', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-image:
+    linear-gradient(rgba(63,193,176,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63,193,176,.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+.box {
+  background: var(--bg-2);
+  border: 3px solid var(--line);
+  box-shadow: 8px 8px 0 rgba(0,0,0,.45);
+  padding: 48px 56px;
+  text-align: center;
+  max-width: 520px;
+}
+.gear { font-size: 0; margin-bottom: 26px; }
+.brand {
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--teal);
+  margin-bottom: 26px;
+}
+.brand b { color: var(--amber); font-weight: normal; }
+h1 {
+  font-family: var(--font-pixel);
+  font-size: clamp(14px, 4vw, 20px);
+  line-height: 1.5;
+  color: var(--cream);
+  margin-bottom: 18px;
+}
+h1 span { color: var(--amber); }
+p { color: var(--cream-dim); font-size: 22px; line-height: 1.4; margin-bottom: 28px; }
+.blink {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  color: var(--teal);
+  letter-spacing: 2px;
+  animation: blink 1.2s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+/* gigi roda pixel */
+.gear svg rect { animation: spin 3s linear infinite; transform-box: fill-box; transform-origin: center; }
+.gear svg rect:nth-child(2n) { animation-duration: 2.4s; animation-direction: reverse; }
+@keyframes spin { to { transform: rotate(360deg); } }

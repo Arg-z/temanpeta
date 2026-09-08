@@ -354,7 +354,7 @@ export function removeOnboarding(host) {
 
 /* ---------- halaman admin ---------- */
 
-export function renderAdmin({ me, onLogout, onOpenMap }) {
+export function renderAdmin({ me, onLogout, onOpenMap, onRefreshLogins }) {
   const app = document.getElementById('app');
   app.replaceChildren();
 
@@ -365,6 +365,12 @@ export function renderAdmin({ me, onLogout, onOpenMap }) {
   });
   const userList = el('div', { class: 'admin-list' });
   const reportList = el('div', { class: 'admin-list' });
+  const loginList = el('div', { class: 'admin-list' });
+  const loginsBtn = el('button', {
+    class: 'btn btn-ghost',
+    text: 'PERBARUI LOG',
+    onclick: onRefreshLogins,
+  });
 
   app.append(
     el(
@@ -390,10 +396,13 @@ export function renderAdmin({ me, onLogout, onOpenMap }) {
         userList,
         el('h2', { class: 'adm-title', text: 'LAPORAN MASUK' }),
         reportList,
+        el('h2', { class: 'adm-title', text: 'LOG MASUK — PERANGKAT & LOKASI IP' }),
+        loginsBtn,
+        loginList,
       ),
     ),
   );
-  return { input, userList, reportList };
+  return { input, userList, reportList, loginList, loginsBtn };
 }
 
 export function adminUserRow(u, { onBan }) {
@@ -438,6 +447,33 @@ export function adminReportRow(r) {
       el('div', { class: 'r', text: `${r.pelapor_id} • ${r.dilaporkan_id}` }),
       el('div', { class: 'r', text: new Date(r.created_at).toLocaleString('id-ID') }),
       el('div', { class: 'r', text: r.reason || '(tanpa alasan)' }),
+    ),
+  );
+}
+
+// Satu peristiwa masuk: perangkat + lokasi IP. UA mentah disimpan di title
+// agar tetap bisa diperiksa tanpa memenuhi kartu.
+export function adminLoginRow(l) {
+  const lokasi = l.geo_city
+    ? [l.geo_city, l.geo_region, l.geo_country].filter(Boolean).join(', ')
+    : 'lokasi IP belum tersedia';
+  return el(
+    'div',
+    { class: 'user-card', title: l.user_agent || undefined },
+    el(
+      'div',
+      { class: 'who' },
+      el('div', {
+        class: 'n',
+        text: `${l.nickname ?? '(akun terhapus)'} — ${l.event === 'register' ? 'DAFTAR' : 'MASUK'}`,
+      }),
+      el('div', { class: 'id', text: `${l.public_id ?? '-'} • ${l.login_id ?? '-'} • IP ${l.ip}` }),
+      el('div', {
+        class: 'r',
+        text: `${l.device ?? 'perangkat tidak dikenal'} • ${l.os ?? 'OS tidak dikenal'} • ${l.browser ?? 'browser tidak dikenal'}`,
+      }),
+      el('div', { class: 'r', text: `${lokasi}${l.geo_isp ? ` • ${l.geo_isp}` : ''}` }),
+      el('div', { class: 'r', text: new Date(l.created_at).toLocaleString('id-ID') }),
     ),
   );
 }

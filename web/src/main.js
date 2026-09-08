@@ -17,6 +17,7 @@ import {
   renderAdmin,
   adminUserRow,
   adminReportRow,
+  adminLoginRow,
   hidePanel,
   toast,
   modal,
@@ -120,6 +121,7 @@ function enterAdmin(me) {
     me,
     onLogout: handleLogout,
     onOpenMap: () => enterShell(me),
+    onRefreshLogins: loadLogins,
   });
 
   async function loadUsers(q = '') {
@@ -179,6 +181,21 @@ function enterAdmin(me) {
     }
   }
 
+  async function loadLogins() {
+    try {
+      const { logins } = await api('/admin/logins');
+      ui.loginList.replaceChildren();
+      if (logins.length === 0) {
+        ui.loginList.append(
+          el('div', { class: 'empty', text: 'Belum ada catatan login sejak fitur ini aktif.' }),
+        );
+      }
+      for (const l of logins) ui.loginList.append(adminLoginRow(l));
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
   let debounce = null;
   ui.input.addEventListener('input', () => {
     clearTimeout(debounce);
@@ -187,6 +204,7 @@ function enterAdmin(me) {
 
   loadUsers();
   loadReports();
+  loadLogins();
 }
 
 /* ---------- kerangka aplikasi (peta) ---------- */

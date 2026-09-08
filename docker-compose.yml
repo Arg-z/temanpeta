@@ -2,6 +2,7 @@ services:
   server:
     build: ./server
     environment:
+      TZ: Asia/Jakarta
       DATABASE_URL: postgres://temanpeta:${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}@db:5432/temanpeta
       PORT: "3000"
       NODE_ENV: production
@@ -12,6 +13,9 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-}
       REPORT_EMAIL_TO: ${REPORT_EMAIL_TO:-}
+    volumes:
+      # zoneinfo host: image dasar (node:alpine) tanpa tzdata, padahal TZ=Asia/Jakarta.
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     depends_on:
       - db
     restart: unless-stopped
@@ -19,6 +23,8 @@ services:
   db:
     image: postgres:16-alpine
     environment:
+      TZ: Asia/Jakarta
+      PGTZ: Asia/Jakarta
       POSTGRES_USER: temanpeta
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}
       POSTGRES_DB: temanpeta
@@ -32,8 +38,12 @@ services:
   web:
     build: ./web
     environment:
+      TZ: Asia/Jakarta
       # TLS publik ditangani nginx di host; Caddy cukup HTTP di dalam container.
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      # zoneinfo host: image dasar (caddy:alpine) tanpa tzdata.
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     ports:
       # Terikat ke loopback saja: nginx (yang memegang 80/443 publik bersama
       # situs lain) meneruskan trafik connext.web.id ke sini.

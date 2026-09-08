@@ -20,6 +20,7 @@ import {
 } from '../auth.js';
 import { selfUser } from '../cards.js';
 import { kickSession } from '../ws.js';
+import { recordLogin } from '../logins.js';
 
 const router = Router();
 const limiter = rateLimit({ windowMs: 10 * 60_000, max: 30 });
@@ -49,6 +50,7 @@ router.post('/register', limiter, async (req, res, next) => {
         const token = await createSession(rows[0].id);
         setSessionCookie(res, token);
         audit('register', req, `user=${rows[0].public_id}`);
+        await recordLogin(rows[0].id, 'register', req);
         return res.status(201).json({ user: selfUser(rows[0]) });
       } catch (err) {
         if (err.code === '23505') {
@@ -95,6 +97,7 @@ router.post('/login', limiter, async (req, res, next) => {
     const token = await createSession(rows[0].id);
     setSessionCookie(res, token);
     audit('login_ok', req, `user=${rows[0].public_id}`);
+    await recordLogin(rows[0].id, 'login_ok', req);
     return res.json({ user: selfUser(rows[0]) });
   } catch (err) {
     return next(err);

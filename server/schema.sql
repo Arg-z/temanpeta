@@ -65,3 +65,43 @@ CREATE TABLE IF NOT EXISTS reports (
 -- Migrasi idempoten: panel admin & status ban.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT false;
+
+-- Log peristiwa masuk untuk admin: perangkat (dari user-agent) + IP +
+-- perkiraan lokasi IP. user_id ON DELETE SET NULL: jejak tetap ada sebagai
+-- "(akun terhapus)" agar pelanggaran tidak hilang lewat hapus akun. Kolom
+-- geo_* diisi belakangan secara asinkron — geo_at = waktu terisi.
+CREATE TABLE IF NOT EXISTS login_events (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+  event       TEXT NOT NULL,                   -- register | login_ok
+  ip          TEXT NOT NULL,
+  user_agent  TEXT NOT NULL DEFAULT '',
+  device      TEXT,                            -- contoh: iPhone XS, SM-S918B
+  os          TEXT,                            -- contoh: iOS 18.7.9
+  browser     TEXT,                            -- contoh: Facebook iOS (in-app)
+  geo_city    TEXT,
+  geo_region  TEXT,
+  geo_country TEXT,
+  geo_isp     TEXT,
+  geo_lat     DOUBLE PRECISION,
+  geo_lon     DOUBLE PRECISION,
+  geo_at      TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_login_events_user ON login_events (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_login_events_created ON login_events (created_at DESC);
+
+-- Cache geolokasi per IP: satu lookup API per IP, bukan per login. Sumber
+-- ipwho.is (HTTPS, tanpa API key), fallback ip-api.com. failed_at menahan
+-- percobaan ulang agar IP yang gagal tidak menghambur API tiap login.
+CREATE TABLE IF NOT EXISTS ip_geo (
+  ip         TEXT PRIMARY KEY,
+  city       TEXT,
+  region     TEXT,
+  country    TEXT,
+  isp        TEXT,
+  lat        DOUBLE PRECISION,
+  lon        DOUBLE PRECISION,
+  failed_at  TIMESTAMPTZ,
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

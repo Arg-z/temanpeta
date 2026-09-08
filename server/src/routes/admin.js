@@ -6,6 +6,7 @@ import { requireAuth } from '../auth.js';
 import { bad, rateLimit, audit } from '../util.js';
 import { getUserByPublicId } from '../cards.js';
 import { kickUser } from '../ws.js';
+import { lookupIp } from '../geo.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -69,6 +70,35 @@ router.get('/reports', async (req, res, next) => {
        LIMIT 100`,
     );
     return res.json({ reports: rows });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Log peristiwa masuk: perangkat, IP, dan perkiraan lokasi IP. Baris tanpa
+// lokasi (baru masuk / lookup belum selesai) dipicu ulang di sini secara
+// fire-and-forget — tampilan berikutnya sudah terisi dari cache ip_geo.
+router.get('/logins', async (req, res, next) => {
+  try {
+    const q = String(req.query.q ?? '').trim();
+    const pat = `%${q}%`;
+    const { rows } = await query(
+      `SELECT l.created_at, l.event, l.ip, l.device, l.os, l.browser, l.user_agent,
+              l.geo_city, l.geo_region, l.geo_country, l.geo_isp, l.geo_lat, l.geo_lon,
+              u.nickname, u.login_id, u.public_id
+       FROM login_events l
+       LEFT JOIN users u ON u.id = l.user_id
+       WHERE ($1 = '%%' OR u.nickname ILIKE $1 OR u.login_id ILIKE $1
+              OR u.public_id ILIKE $1 OR l.ip ILIKE $1)
+       ORDER BY l.created_at DESC
+       LIMIT 200`,
+      [pat],
+    );
+    for (const ip of [...new Set(rows.filter((r) => r.geo_city === null).map((r) => r.ip))]) {
+      lookupIp(ip).catch(() => {});
+    }
+    audit('admin_logins', req, `n=${rows.length}`);
+    return res.json({ logins: rows });
   } catch (err) {
     return next(err);
   }
