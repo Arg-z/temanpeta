@@ -5,8 +5,11 @@ export function createSocket({ onEvent, onOpen }) {
   let ws = null;
   let retry = 0;
   let closed = false;
+  let retryTimer = null;
 
   function open() {
+    if (closed) return;
+    retryTimer = null;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(`${proto}://${location.host}/ws`);
     ws.onopen = () => {
@@ -27,7 +30,7 @@ export function createSocket({ onEvent, onOpen }) {
         window.dispatchEvent(new CustomEvent('tp:unauthorized'));
         return;
       }
-      setTimeout(open, Math.min(1000 * 2 ** retry++, 15_000));
+      retryTimer = setTimeout(open, Math.min(1000 * 2 ** retry++, 15_000));
     };
   }
 
@@ -39,6 +42,8 @@ export function createSocket({ onEvent, onOpen }) {
     },
     close() {
       closed = true;
+      clearTimeout(retryTimer);
+      retryTimer = null;
       ws?.close();
     },
   };

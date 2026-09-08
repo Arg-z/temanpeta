@@ -10,6 +10,9 @@ export function createChat(root, { onTyping, onOpenProfile, onSeen }) {
   let oldestId = null;
   let typingHideTimer = null;
   let typingSentAt = 0;
+  // Setiap pembukaan/penutupan membatalkan hasil async percakapan sebelumnya,
+  // termasuk bila pengguna kembali ke orang yang sama.
+  let conversationVersion = 0;
 
   root.classList.add('hidden');
 
@@ -37,12 +40,15 @@ export function createChat(root, { onTyping, onOpenProfile, onSeen }) {
     e.preventDefault();
     const body = input.value.trim();
     if (!body || !partner) return;
+    const version = conversationVersion;
+    const to = partner.publicId;
     input.value = '';
     try {
-      const res = await api('/messages', { method: 'POST', body: { to: partner.publicId, body } });
+      const res = await api('/messages', { method: 'POST', body: { to, body } });
+      if (version !== conversationVersion) return;
       append({ id: res.id, body, createdAt: res.createdAt, mine: true });
     } catch (err) {
-      input.value = body;
+      if (version === conversationVersion) input.value = body;
       toast(err.message, true);
     }
   });
@@ -83,6 +89,7 @@ export function createChat(root, { onTyping, onOpenProfile, onSeen }) {
   }
 
   async function open(user) {
+    const version = ++conversationVersion;
     partner = user;
     root.classList.remove('hidden');
     headTitle.textContent = user.nickname;
@@ -90,10 +97,13 @@ export function createChat(root, { onTyping, onOpenProfile, onSeen }) {
     msgs.replaceChildren();
     oldestId = null;
     btnMore.remove();
+    input.value = '';
+    clearTimeout(typingHideTimer);
     typingLine.textContent = '';
     let lastId = null;
     try {
       const { messages } = await api(`/messages/${user.publicId}`);
+      if (version !== conversationVersion) return;
       if (messages.length > 0) {
         oldestId = messages[0].id;
         lastId = messages[messages.length - 1].id;
@@ -107,14 +117,16 @@ export function createChat(root, { onTyping, onOpenProfile, onSeen }) {
       scrollBottom();
       input.focus();
     } catch (err) {
-      toast(err.message, true);
+      if (version === conversationVersion) toast(err.message, true);
     }
   }
 
   async function loadOlder() {
     if (!partner || oldestId == null) return;
+    const version = conversationVersion;
     try {
       const { messages } = await api(`/messages/${partner.publicId}?before=${oldestId}`);
+      if (version !== conversationVersion) return;
       if (messages.length < 50) btnMore.remove();
       if (messages.length > 0) {
         oldestId = messages[0].id;
@@ -123,12 +135,15 @@ export function createChat(root, { onTyping, onOpenProfile, onSeen }) {
         msgs.scrollTop += msgs.scrollHeight - prevHeight;
       }
     } catch (err) {
-      toast(err.message, true);
+      if (version === conversationVersion) toast(err.message, true);
     }
   }
 
   function close() {
+    conversationVersion += 1;
     partner = null;
+    input.value = '';
+    clearTimeout(typingHideTimer);
     root.classList.add('hidden');
   }
 

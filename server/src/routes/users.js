@@ -3,7 +3,7 @@ import { query } from '../db.js';
 import { requireAuth } from '../auth.js';
 import { bad, rateLimit } from '../util.js';
 import { searchRegions, snapLocation, getRegion } from '../regions.js';
-import { userCard, selfUser, getUserByPublicId, isFriendPair, blockedBetween, relationTo } from '../cards.js';
+import { userCard, selfUser, getUserByPublicId, isFriendPair, relationTo } from '../cards.js';
 import { broadcastOthers, isOnline } from '../ws.js';
 
 const router = Router();
@@ -37,8 +37,11 @@ router.get('/regions', (req, res) => {
 router.get('/presence-map', presenceLimiter, async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT * FROM users
-       WHERE id <> $1 AND visibility AND region_code IS NOT NULL`,
+      `SELECT * FROM users u
+       WHERE u.id <> $1 AND u.visibility AND u.region_code IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM blocks b
+                         WHERE (b.blocker = $1 AND b.blocked = u.id)
+                            OR (b.blocker = u.id AND b.blocked = $1))`,
       [req.user.id],
     );
     const users = rows
@@ -84,7 +87,7 @@ router.patch('/me', meLimiter, async (req, res, next) => {
     // nickname + centroid wilayah agar titik bisa langsung digambar.
     if (req.body.visibility !== undefined) {
       const reg = rows[0].region_code ? getRegion(rows[0].region_code) : null;
-      broadcastOthers(req.user.id, {
+      await broadcastOthers(req.user.id, {
         type: 'user.visibility',
         publicId: rows[0].public_id,
         visible: rows[0].visibility,
@@ -157,9 +160,10 @@ router.get('/users', searchLimiter, async (req, res, next) => {
     );
     const users = [];
     for (const row of rows) {
-      const reg = row.region_code ? getRegion(row.region_code) : null;
+      const card = userCard(row, { isFriend: await isFriendPair(req.user.id, row.id) });
+      const reg = card.region ? getRegion(card.region.code) : null;
       users.push({
-        ...userCard(row, { isFriend: await isFriendPair(req.user.id, row.id) }),
+        ...card,
         lat: reg?.lat ?? null,
         lng: reg?.lng ?? null,
       });
@@ -205,10 +209,19 @@ router.get('/users/:publicId', lookupLimiter, async (req, res, next) => {
   try {
     const other = await getUserByPublicId(req.params.publicId);
     if (!other) return bad(res, 404, 'Pengguna tidak ditemukan.');
+    const { rows: blocks } = await query(
+      `SELECT blocker FROM blocks
+       WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)`,
+      [req.user.id, other.id],
+    );
+    const blockedByMe = blocks.some((b) => b.blocker === req.user.id);
+    if (blocks.length > 0 && !blockedByMe) return bad(res, 404, 'Pengguna tidak ditemukan.');
     const relation = await relationTo(req.user.id, other.id);
-    const blockedByMe = await blockedBetween(req.user.id, other.id);
+    const card = userCard(other, { isFriend: relation === 'friend' });
     return res.json({
-      user: userCard(other, { isFriend: relation === 'friend' }),
+      // Pemblokir tetap dapat membuka profil untuk membatalkan blokir,
+      // tetapi tidak mendapat wilayah atau status kehadiran pihak lain.
+      user: blockedByMe ? { ...card, visibility: false, region: null, online: false } : card,
       relation,
       blockedByMe,
     });

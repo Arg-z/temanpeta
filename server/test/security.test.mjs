@@ -4,6 +4,9 @@
 // di-spawn otomatis oleh file ini pada PORT 3100.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import WebSocket from 'ws';
+import { spawn } from 'node:child_process';
 
 import { resetRateLimits } from '../src/util.js';
 
@@ -450,5 +453,163 @@ test('WS: maksimal 5 koneksi bersamaan per pengguna (ke-6 ditutup 4008)', async 
   assert.equal(health.status, 200);
 });
 
+// Regresi audit: privasi wilayah, blokir, pencabutan sesi, dan error frame WS.
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function eventually(predicate, timeout = 3000) {
+  const end = Date.now() + timeout;
+  while (!predicate() && Date.now() < end) await pause(20);
+  assert.ok(predicate(), 'kondisi tidak tercapai sebelum timeout');
+}
 
+async function fixture(tag) {
+  const c = client(`reg_${tag}`);
+  c.loginId = `rg_${tag}_${run}`;
+  const r = await c.fetch('/register', {
+    method: 'POST', body: { loginId: c.loginId, password: 'test12345678', nickname: `Test ${tag}` },
+  });
+  assert.equal(r.status, 201);
+  c.user = r.json.user;
+  return c;
+}
+
+async function fixtureSocket(t, c) {
+  const { query } = await import('../src/db.js');
+  const { publish } = await import('../src/ws.js');
+  const { rows: [user] } = await query('SELECT id FROM users WHERE public_id = $1', [c.user.publicId]);
+  const ws = new WebSocket('ws://127.0.0.1:3100/ws', { headers: { Cookie: jar.get(c.name) } });
+  ws.events = [];
+  ws.on('error', () => {});
+  ws.on('message', (raw) => ws.events.push(JSON.parse(String(raw))));
+  ws.on('close', (code) => { ws.closeCode = code; });
+  t.after(() => ws.terminate());
+  await once(ws, 'open');
+  // Handshake HTTP sudah selesai sebelum query autentikasi WS selesai.
+  // Probe menunggu socket ini benar-benar terdaftar tanpa sleep arbitrer.
+  await eventually(() => {
+    publish(user.id, { type: 'test.ready' });
+    return ws.events.some((e) => e.type === 'test.ready');
+  });
+  ws.events.length = 0;
+  return ws;
+}
+
+test('privasi: pencarian ID menyembunyikan centroid non-teman tetapi mempertahankannya untuk teman', async () => {
+  const a = await fixture('loca');
+  const b = await fixture('locb');
+  await a.fetch('/me/location', { method: 'POST', body: { lat: -6.9175, lng: 107.6191 } });
+  const hidden = (await b.fetch('/users?q=' + a.user.publicId)).json.users[0];
+  assert.equal(hidden.region, null);
+  assert.equal(hidden.lat, null);
+  assert.equal(hidden.lng, null);
+  const fr = await a.fetch('/friend-requests', { method: 'POST', body: { publicId: b.user.publicId } });
+  await b.fetch(`/friend-requests/${fr.json.id}/accept`, { method: 'POST' });
+  const friend = (await b.fetch('/users?q=' + a.user.publicId)).json.users[0];
+  assert.ok(friend.region);
+  assert.equal(typeof friend.lat, 'number');
+  assert.equal(typeof friend.lng, 'number');
+});
+
+test('blokir: peta dan broadcast menyaring kedua arah, pengguna lain tetap melihat', async (t) => {
+  const a = await fixture('mapa');
+  const b = await fixture('mapb');
+  const c = await fixture('mapc');
+  const wa = await fixtureSocket(t, a);
+  const wb = await fixtureSocket(t, b);
+  const wc = await fixtureSocket(t, c);
+  for (const user of [a, b]) {
+    await user.fetch('/me/location', { method: 'POST', body: { lat: -6.9175, lng: 107.6191 } });
+    await user.fetch('/me', { method: 'PATCH', body: { visibility: true } });
+  }
+  await eventually(() => wc.events.some((e) => e.type === 'user.visibility' && e.publicId === b.user.publicId));
+  await a.fetch('/blocks', { method: 'POST', body: { publicId: b.user.publicId } });
+  assert.ok(!(await b.fetch('/presence-map')).json.users.some((u) => u.publicId === a.user.publicId));
+  assert.ok(!(await a.fetch('/presence-map')).json.users.some((u) => u.publicId === b.user.publicId));
+  assert.ok((await c.fetch('/presence-map')).json.users.some((u) => u.publicId === a.user.publicId));
+  wa.events.length = wb.events.length = wc.events.length = 0;
+  await a.fetch('/me', { method: 'PATCH', body: { visibility: false } });
+  await b.fetch('/me', { method: 'PATCH', body: { visibility: false } });
+  await eventually(() => wc.events.filter((e) => e.type === 'user.visibility').length === 2);
+  assert.ok(!wb.events.some((e) => e.type === 'user.visibility' && e.publicId === a.user.publicId));
+  assert.ok(!wa.events.some((e) => e.type === 'user.visibility' && e.publicId === b.user.publicId));
+  // Jalur online/offline memakai filter yang sama.
+  await a.fetch('/me', { method: 'PATCH', body: { visibility: true } });
+  wa.close();
+  await eventually(() => wc.events.some((e) => e.type === 'user.offline' && e.publicId === a.user.publicId));
+  await fixtureSocket(t, a);
+  await eventually(() => wc.events.some((e) => e.type === 'user.online' && e.publicId === a.user.publicId));
+  assert.ok(!wb.events.some((e) => e.type.startsWith('user.') && e.publicId === a.user.publicId));
+});
+
+test('blokir: hanya pemblokir mendapat aksi buka blokir; profilnya tersembunyi dari pihak diblokir', async () => {
+  const a = await fixture('dira');
+  const b = await fixture('dirb');
+  await a.fetch('/blocks', { method: 'POST', body: { publicId: b.user.publicId } });
+  const ownBlock = await a.fetch('/users/' + b.user.publicId);
+  assert.equal(ownBlock.json.blockedByMe, true);
+  assert.equal((await b.fetch('/users/' + a.user.publicId)).status, 404);
+  await a.fetch('/blocks/' + b.user.publicId, { method: 'DELETE' });
+  const unblocked = await b.fetch('/users/' + a.user.publicId);
+  assert.equal(unblocked.status, 200);
+  assert.equal(unblocked.json.blockedByMe, false);
+});
+
+test('WS logout: hanya socket sesi yang dicabut mati, sesi lain tetap menerima chat', async (t) => {
+  const a = await fixture('loga');
+  const b = await fixture('logb');
+  const second = client('log-second');
+  second.user = a.user;
+  await second.fetch('/login', { method: 'POST', body: { loginId: a.loginId, password: 'test12345678' } });
+  const firstSocket = await fixtureSocket(t, a);
+  const secondSocket = await fixtureSocket(t, second);
+  const fr = await b.fetch('/friend-requests', { method: 'POST', body: { publicId: a.user.publicId } });
+  await a.fetch(`/friend-requests/${fr.json.id}/accept`, { method: 'POST' });
+  assert.equal((await a.fetch('/logout', { method: 'POST' })).status, 204);
+  await eventually(() => firstSocket.closeCode === 4001);
+  assert.equal((await second.fetch('/me')).status, 200);
+  await b.fetch('/messages', { method: 'POST', body: { to: a.user.publicId, body: 'setelah logout' } });
+  await eventually(() => secondSocket.events.some((e) => e.type === 'message.new'));
+  assert.ok(!firstSocket.events.some((e) => e.type === 'message.new'));
+  assert.equal(secondSocket.readyState, WebSocket.OPEN);
+});
+
+test('WS expiry: pemeriksaan berkala mencabut sesi tertentu walau ada sesi lain', { timeout: 35000 }, async (t) => {
+  const { query } = await import('../src/db.js');
+  const { hashToken } = await import('../src/util.js');
+  const a = await fixture('expa');
+  const second = client('exp-second');
+  second.user = a.user;
+  await second.fetch('/login', { method: 'POST', body: { loginId: a.loginId, password: 'test12345678' } });
+  const expired = await fixtureSocket(t, a);
+  const active = await fixtureSocket(t, second);
+  await query('UPDATE sessions SET expires_at = now() - interval \'1 second\' WHERE token = $1', [hashToken(jar.get(a.name).split('=')[1])]);
+  await eventually(() => expired.closeCode === 4001, 31000);
+  assert.equal(active.readyState, WebSocket.OPEN);
+  assert.equal((await second.fetch('/me')).status, 200);
+});
+
+// Jalankan proses biasa: node:test menangkap uncaughtException dan dapat
+// membuat crash backend tampak seolah-olah proses tetap sehat.
+test('WS oversized: koneksi ditutup 1009 tanpa menjatuhkan server', async (t) => {
+  const a = await fixture('frame');
+  const child = spawn(process.execPath, [new URL('../src/index.js', import.meta.url).pathname], {
+    env: { ...process.env, PORT: '3191' }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  child.stdout.on('data', (chunk) => { output += chunk; });
+  child.stderr.on('data', (chunk) => { output += chunk; });
+  t.after(async () => {
+    if (child.exitCode === null) { child.kill(); await once(child, 'exit'); }
+  });
+  await eventually(() => output.includes('server siap di port 3191'));
+  const ws = new WebSocket('ws://127.0.0.1:3191/ws', { headers: { Cookie: jar.get(a.name) } });
+  ws.on('error', () => {});
+  ws.on('close', (code) => { ws.closeCode = code; });
+  t.after(() => ws.terminate());
+  await once(ws, 'open');
+  ws.send('x'.repeat(4097));
+  await eventually(() => ws.closeCode === 1009);
+  assert.equal((await fetch('http://127.0.0.1:3191/api/health')).status, 200);
+  assert.equal(child.exitCode, null, output);
+  assert.ok(!output.includes("Unhandled 'error' event"), output);
+});
 

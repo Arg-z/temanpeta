@@ -19,6 +19,7 @@ import {
   tokenFromRequest,
 } from '../auth.js';
 import { selfUser } from '../cards.js';
+import { kickSession } from '../ws.js';
 
 const router = Router();
 const limiter = rateLimit({ windowMs: 10 * 60_000, max: 30 });
@@ -103,6 +104,7 @@ router.post('/login', limiter, async (req, res, next) => {
 router.post('/logout', requireAuth, async (req, res, next) => {
   try {
     await deleteSession(req.token);
+    kickSession(req.user.id, req.token);
     clearSessionCookie(res);
     audit('logout', req, `user=${req.user.public_id}`);
     return res.status(204).end();

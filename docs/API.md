@@ -8,6 +8,9 @@ Setelah `POST /api/register` atau `POST /api/login`, server menyetel **cookie se
 
 Koneksi WebSocket `/ws` memakai cookie yang sama saat handshake; sesi invalid ditutup dengan close code `4001`.
 
+Logout menutup seluruh socket yang memakai sesi tersebut; sesi lain milik akun
+yang sama tetap aktif. Masa berlaku diperiksa per sesi socket, bukan per akun.
+
 Untuk skrip/tes non-browser, header `Authorization: Bearer <token>` masih diterima sebagai fallback (token tidak pernah dikembalikan di body respons; ambil dari header `Set-Cookie`). Token di sisi server disimpan sebagai hash SHA-256.
 
 ### Dua lapis identitas
@@ -76,7 +79,12 @@ Bentuk `UserCard` (pengguna lain):
 }
 ```
 
-`region` bernilai `null` bila visibilitas mati, **kecuali** untuk teman (teman selalu melihat wilayah, tanpa koordinat presisi).
+`region` bernilai `null` bila visibilitas mati, **kecuali** untuk teman (teman selalu melihat wilayah, tanpa koordinat presisi). Koordinat centroid `lat`/`lng` pada hasil pencarian mengikuti aturan yang sama dan bernilai `null` ketika wilayah disembunyikan.
+
+Blokir berlaku dua arah pada peta kehadiran dan event kehadiran WebSocket.
+Lookup profil pemblokir dari pihak yang diblokir mendapat `404`. Pemblokir
+tetap dapat membuka profil pihak yang ia blokir dengan `blockedByMe: true`
+untuk membatalkan blokir, tetapi wilayah dan status online pihak itu disembunyikan.
 
 ### Pertemanan
 

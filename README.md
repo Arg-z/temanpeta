@@ -48,10 +48,32 @@ Skema database dibuat otomatis saat server pertama kali jalan.
 
 ### Tes
 
+Tes backend memakai database uji yang sudah dibuat dan terpisah dari data aplikasi.
+Jalankan dari `server/`; suite memulai backend sendiri pada port 3100
+(tes crash memakai proses tambahan pada port 3191).
+
+```bash
+TEST_DATABASE_URL='postgres://postgres:postgres@localhost:54329/temanpeta_test' npm test
+```
+
+Smoke test berikut juga dijalankan dari `server/`, dengan backend uji sudah hidup:
+
 ```bash
 # smoke test end-to-end (register 3 akun, pertemanan, chat WS, blokir, laporan)
 node scripts/smoke-test.mjs
 ```
+
+Tes browser untuk pergantian chat, respons terlambat, dan reconnect dijalankan dari `web/`:
+
+```bash
+npm ci
+npx playwright install chromium
+npm test
+```
+
+Jika Chromium sudah tersedia, arahkan `CHROMIUM_EXECUTABLE_PATH` ke binarinya.
+Tes browser memakai halaman fixture lokal dan respons API terkontrol; tidak
+memerlukan backend atau layanan peta eksternal.
 
 ## Memindahkan ke server produksi (Ubuntu 24.04 + Docker)
 

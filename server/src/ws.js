@@ -21,6 +21,10 @@ function sessionTokenFromReq(req) {
 }
 
 function send(ws, event) {
+  if (Date.now() >= ws.sessionExpiresAt) {
+    ws.close(4001, 'sesi berakhir');
+    return;
+  }
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(event));
 }
 
@@ -43,11 +47,25 @@ export async function notifyFriends(userId, event) {
   for (const row of rows) if (row.other !== userId) publish(row.other, event);
 }
 
-// Kirim event ke semua pengguna lain yang terhubung (kehadiran publik).
-export function broadcastOthers(userId, event) {
+// Kehadiran publik tetap menghormati blokir di kedua arah.
+export async function broadcastOthers(userId, event) {
+  const { rows } = await query(
+    `SELECT CASE WHEN blocker = $1 THEN blocked ELSE blocker END AS other
+     FROM blocks WHERE blocker = $1 OR blocked = $1`,
+    [userId],
+  );
+  const excluded = new Set(rows.map((row) => row.other));
   for (const [id, set] of online) {
-    if (id === userId) continue;
+    if (id === userId || excluded.has(id)) continue;
     for (const ws of set) send(ws, event);
+  }
+}
+
+// Logout hanya mencabut socket milik sesi ini; perangkat lain tetap aktif.
+export function kickSession(userId, token) {
+  const hashed = hashToken(token);
+  for (const ws of online.get(userId) ?? []) {
+    if (ws.sessionHash === hashed) ws.close(4001, 'sesi berakhir');
   }
 }
 
@@ -70,6 +88,9 @@ export function initWs(httpServer) {
   });
 
   wss.on('connection', async (ws, req) => {
+    // Error frame dipancarkan oleh EventEmitter, di luar try/catch async.
+    // Pasang sebelum await pertama, termasuk untuk handshake yang ditolak.
+    ws.on('error', (err) => console.error('WS socket error:', err.message));
     // Listener async ws tidak diproses EventEmitter — rejection yang lolos
     // menjadi unhandledRejection dan menjatuhkan proses. Semua jalur
     // dibungkus try/catch (CWE-248).
@@ -99,7 +120,7 @@ export function initWs(httpServer) {
         return;
       }
       const { rows } = await query(
-        `SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
+        `SELECT u.*, s.expires_at AS session_expires_at FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE (s.token = $1 OR s.token = $2) AND s.expires_at > now()`,
         [hashToken(token), token],
       );
@@ -108,6 +129,9 @@ export function initWs(httpServer) {
         return;
       }
       const user = rows[0];
+      if (ws.readyState !== ws.OPEN) return;
+      ws.sessionHash = hashToken(token);
+      ws.sessionExpiresAt = new Date(user.session_expires_at).getTime();
 
       // Pembatas laju pesan per koneksi: typing hanya butuh sedikit bandwidth.
       let msgTimes = [];
@@ -120,26 +144,6 @@ export function initWs(httpServer) {
       }
       set.add(ws);
 
-      if (set.size === 1) {
-        await notifyFriends(user.id, {
-          type: 'friend.online',
-          publicId: user.public_id,
-        });
-        // Kehadiran pengguna bervisibilitas nyala diumumkan ke semua koneksi
-        // (dipakai frontend untuk menampilkan/menghilangkan titik peta realtime).
-        // Ikutkan nickname + centroid wilayah agar titik langsung bisa digambar.
-        if (user.visibility) {
-          const reg = user.region_code ? getRegion(user.region_code) : null;
-          broadcastOthers(user.id, {
-            type: 'user.online',
-            publicId: user.public_id,
-            nickname: user.nickname,
-            lat: reg?.lat ?? null,
-            lng: reg?.lng ?? null,
-          });
-        }
-      }
-
       ws.isAlive = true;
       ws.on('pong', () => {
         ws.isAlive = true;
@@ -147,6 +151,11 @@ export function initWs(httpServer) {
 
       ws.on('message', async (raw) => {
         try {
+          if (ws.readyState !== ws.OPEN) return;
+          if (Date.now() >= ws.sessionExpiresAt) {
+            ws.close(4001, 'sesi berakhir');
+            return;
+          }
           // Banjir pesan: lebih dari 40 pesan / 10 detik → tutup koneksi.
           const nowMs = Date.now();
           msgTimes = msgTimes.filter((t) => nowMs - t < 10_000);
@@ -199,7 +208,7 @@ export function initWs(httpServer) {
                 user.id,
               ]);
               if (fresh[0]?.visibility) {
-                broadcastOthers(user.id, { type: 'user.offline', publicId: user.public_id });
+                await broadcastOthers(user.id, { type: 'user.offline', publicId: user.public_id });
               }
             }
           }
@@ -207,6 +216,24 @@ export function initWs(httpServer) {
           console.error('WS close error:', err.message);
         }
       });
+
+      // Listener cleanup sudah terpasang sebelum query notifikasi dimulai.
+      if (set.size === 1) {
+        await notifyFriends(user.id, {
+          type: 'friend.online',
+          publicId: user.public_id,
+        });
+        if (user.visibility && ws.readyState === ws.OPEN) {
+          const reg = user.region_code ? getRegion(user.region_code) : null;
+          await broadcastOthers(user.id, {
+            type: 'user.online',
+            publicId: user.public_id,
+            nickname: user.nickname,
+            lat: reg?.lat ?? null,
+            lng: reg?.lng ?? null,
+          });
+        }
+      }
     } catch (err) {
       console.error('WS connection error:', err.message);
       try {
@@ -227,27 +254,26 @@ export function initWs(httpServer) {
     if (ids.length > 0) {
       try {
         const { rows } = await query(
-          `SELECT DISTINCT s.user_id FROM sessions s
+          `SELECT s.token FROM sessions s
            JOIN users u ON u.id = s.user_id
            WHERE s.expires_at > now() AND NOT u.banned
              AND s.user_id = ANY($1)`,
           [ids],
         );
-        valid = new Set(rows.map((r) => r.user_id));
+        // Sesi legacy dapat di-upgrade oleh request REST selama socket aktif.
+        valid = new Set(rows.map((r) => r.token.startsWith('sha256$') ? r.token : hashToken(r.token)));
       } catch (err) {
         console.error('Gagal cek sesi WS:', err.message);
         return;
       }
     }
-    for (const [userId, set] of online) {
-      if (!valid.has(userId)) {
-        for (const ws of set) {
-          try { ws.close(4001, 'sesi berakhir'); } catch { /* sudah tertutup */ }
-        }
-        online.delete(userId);
-        continue;
-      }
+    for (const set of online.values()) {
       for (const ws of set) {
+        if (ws.readyState !== ws.OPEN) continue;
+        if (!valid.has(ws.sessionHash) || Date.now() >= ws.sessionExpiresAt) {
+          ws.close(4001, 'sesi berakhir');
+          continue;
+        }
         if (!ws.isAlive) {
           ws.terminate();
           continue;
