@@ -645,6 +645,19 @@ test('bio: tersimpan ternormalisasi, publik, dan divalidasi', async () => {
   assert.equal(hapus.status, 200);
   assert.equal(hapus.json.user.bio, null);
 
+  // Karakter kendali/tak terlihat dibuang, tetapi emoji tetap utuh.
+  // Bidi override (U+202E) bisa memutar balik arah teks di bio orang lain,
+  // jadi wajib tidak ikut tersimpan.
+  const bidi = await a.fetch('/me', {
+    method: 'PATCH',
+    body: { bio: 'halo\u202ehgnis\u200b dan \u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466} \u2764\uFE0F' },
+  });
+  assert.equal(bidi.status, 200);
+  assert.equal(bidi.json.user.bio, 'halohgnis dan \u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466} \u2764\uFE0F');
+  assert.ok(!bidi.json.user.bio.includes('\u202e'), 'bidi override harus dibuang');
+  assert.ok(!bidi.json.user.bio.includes('\u200b'), 'zero-width space harus dibuang');
+  assert.ok(bidi.json.user.bio.includes('\u200d'), 'ZWJ harus dipertahankan untuk emoji');
+
   // Pemblokir tidak mendapat bio pihak yang ia blokir.
   await a.fetch('/me', { method: 'PATCH', body: { bio: 'rahasia' } });
   await b.fetch('/blocks', { method: 'POST', body: { publicId: a.user.publicId } });

@@ -60,15 +60,22 @@ export const LOGIN_ID_RE = /^[a-z0-9_]{3,24}$/;
 export const BIO_MAX = 160;
 
 // Rapikan bio sebelum disimpan. Baris baru diizinkan (bio boleh dua baris),
-// tetapi karakter kontrol C0/C1 lain dibuang supaya input klien tidak bisa
-// menyelipkan karakter kendali ke tampilan orang lain. Zero-width joiner
-// (U+200D) sengaja DIPERTAHANKAN agar emoji gabungan tetap utuh.
+// tetapi karakter kendali/tak terlihat dibuang supaya klien tidak bisa
+// menyelipkan karakter kendali ke tampilan orang lain:
+//   - C0 (kecuali \t \n) dan C1 (\u0080-\u009F)
+//   - bidi embed/override/isolate (\u202A-\u202E, \u2066-\u2069, \u200E/\u200F,
+//     \u061C) — bisa MEMUTAR BALIK arah teks di bio orang lain (kelas
+//     "Trojan Source"), jadi tidak boleh ikut tersimpan
+//   - karakter tak terlihat lain: soft hyphen, ZWSP, word joiner, BOM
+// Sengaja DIPERTAHANKAN agar emoji tetap utuh: ZWJ (U+200D), ZWNJ (U+200C),
+// variation selector U+FE0E/U+FE0F, dan tag flag (U+E0020-U+E007F).
 // Mengembalikan null bila nilai bukan string (pemanggil membalas 400).
 export function normalizeBio(value) {
   if (typeof value !== 'string') return null;
   return value
     .replace(/\r\n?/g, '\n')
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/[\u0080-\u009F\u00AD\u061C\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]/g, '')
     .replace(/[^\S\n]+/g, ' ') // tab/spasi beruntun → satu spasi
     .replace(/ *\n */g, '\n')
     .replace(/\n{3,}/g, '\n\n')

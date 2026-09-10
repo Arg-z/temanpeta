@@ -53,7 +53,7 @@ Bentuk `user` (milik sendiri):
 
 | Metode & path | Body | Respons | Catatan |
 |---|---|---|---|
-| `PATCH /api/me` | `{nickname?, visibility?, bio?}` | `200 {user}` | `bio` maks 160 karakter; string kosong menghapus bio (jadi `null`). |
+| `PATCH /api/me` | `{nickname?, visibility?, bio?}` | `200 {user}` | `bio` maks 160 karakter; string kosong menghapus bio (jadi `null`). Server merapikan teks: spasi/baris berlebih dirapatkan, dan karakter kendali/tak terlihat (C0/C1, bidi override, zero-width) dibuang — emoji gabungan (ZWJ) tetap utuh. |
 | `POST /api/me/location` | `{lat, lng}` | `200 {region, user}` | Server melengkapi koordinat ke kabupaten/kota terdekat (≤ 60 km) atau provinsi terdekat. **Tidak ada koordinat yang disimpan** — hanya kode wilayah. |
 
 ### Wilayah & pencarian

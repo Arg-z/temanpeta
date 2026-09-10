@@ -704,6 +704,10 @@ function openMePanel() {
         const { user } = await api('/me', { method: 'PATCH', body: { nickname, bio } });
         state.me = user;
         state.ui.setMe(user);
+        // Render ulang panel: server merapikan bio (spasi/karakter tak
+        // terlihat), jadi kolom isian harus menampilkan teks hasil simpan,
+        // bukan teks mentah yang tadi diketik.
+        openMePanel();
         toast('Perubahan disimpan.');
       } catch (err) {
         toast(err.message, true);
