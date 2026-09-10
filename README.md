@@ -22,7 +22,8 @@ nginx (host) — TLS untuk connext.web.id + app.connext.web.id (certbot)
 - `server/` — REST API, WebSocket, skema DB, data wilayah 38 provinsi + 514 kab/kota.
 - `web/` — frontend vanilla JS + MapLibre (tanpa framework), tema 8-bit.
 - `landing/` — landing page publik di `connext.web.id`, dilayani nginx langsung dari folder ini (edit = langsung live, tanpa build). CTA-nya mengarah ke `app.connext.web.id`.
-- `deploy/` — config nginx, skrip setup HTTPS, dan skrip pemisahan landing/app (`setup-split.sh`).
+- `deploy/` — config nginx, skrip setup HTTPS, skrip pemisahan landing/app (`setup-split.sh`), dan toggle mode pemeliharaan (`maintenance.sh`).
+- `maintenance/` — halaman "under maintenance" + file penanda yang dibaca Caddy.
 - `docs/API.md` — kontrak lengkap REST + WebSocket (untuk frontend alternatif/AI).
 
 ## Menjalankan untuk development (tanpa Docker)
@@ -108,6 +109,33 @@ docker compose up -d --build
 ```
 
 Skema database dimigrasi otomatis (idempoten) saat server boot.
+
+### Mode pemeliharaan
+
+Menampilkan halaman "under maintenance" ke pengunjung, tanpa menghentikan
+container atau mengedit nginx:
+
+```bash
+./deploy/maintenance.sh status      # lihat keadaan sekarang
+./deploy/maintenance.sh on          # nyalakan (app + landing)
+./deploy/maintenance.sh on app      # hanya app.connext.web.id
+./deploy/maintenance.sh on landing  # hanya connext.web.id
+./deploy/maintenance.sh off         # kembalikan normal
+./deploy/maintenance.sh verify      # cek hasilnya lewat HTTP
+```
+
+- **app** — Caddy menyajikan `maintenance/index.html` selama file penanda
+  `maintenance/ON` ada (folder `maintenance/` di-mount ke `/srv/www/maint`).
+  Saat aktif, `/api/*` dan `/ws` membalas `503` JSON supaya klien yang menunggu
+  JSON tidak salah mengurai HTML. Toggle berlaku **seketika** — tanpa rebuild
+  image maupun restart container.
+- **landing** — `landing/index.html` ditukar sementara; salinan aslinya
+  disimpan di `maintenance/.landing-index.orig.html` sampai `off`. nginx
+  melayani folder itu langsung, jadi tidak perlu reload.
+
+Halaman ada di `maintenance/index.html` + `maintenance/style.css` (tema 8-bit).
+Sengaja **tanpa style/script inline** agar lolos CSP ketat milik app
+(`style-src 'self' …`).
 
 ## Catatan penting
 

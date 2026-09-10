@@ -1,3 +1,11 @@
+/* Halaman pemeliharaan TemanPeta — tema 8-bit (navy, krem, teal, amber).
+   Dipakai dua konteks:
+   - app.connext.web.id : disajikan Caddy dari /srv/www/maint (root diarahkan
+     ke folder maintenance/), jadi CSS tersedia di /style.css.
+   - connext.web.id     : landing/index.html ditukar sementara dan file ini
+     disalin ke landing/style.css, jadi /style.css juga tersedia.
+   Tidak memakai style/script inline agar lolos CSP ketat milik app. */
+
 :root {
   --bg: #101a2e;
   --bg-2: #182338;
@@ -9,31 +17,69 @@
   --font-pixel: 'Press Start 2P', monospace;
   --font-body: 'VT323', monospace;
 }
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; }
+
+html, body { min-height: 100%; }
+
 body {
   background: var(--bg);
   color: var(--cream);
   font-family: var(--font-body);
   font-size: 20px;
+  line-height: 1.4;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  padding: 24px;
+  /* kisi halus ala peta */
   background-image:
-    linear-gradient(rgba(63,193,176,.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(63,193,176,.06) 1px, transparent 1px);
+    linear-gradient(rgba(63, 193, 176, .06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63, 193, 176, .06) 1px, transparent 1px);
   background-size: 44px 44px;
 }
+
+/* Efek garis pemindai CRT tipis, murni dekoratif. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, .12) 0 2px,
+    transparent 2px 4px
+  );
+  opacity: .5;
+}
+
 .box {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 560px;
   background: var(--bg-2);
   border: 3px solid var(--line);
-  box-shadow: 8px 8px 0 rgba(0,0,0,.45);
-  padding: 48px 56px;
+  box-shadow: 8px 8px 0 rgba(0, 0, 0, .45);
+  padding: 46px 40px 40px;
   text-align: center;
-  max-width: 520px;
 }
-.gear { font-size: 0; margin-bottom: 26px; }
+
+/* ---------- roda gigi ---------- */
+
+.gear {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+  font-size: 0;
+}
+
+.gear svg { animation: spin 4s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- teks ---------- */
+
 .brand {
   font-family: var(--font-pixel);
   font-size: 13px;
@@ -41,16 +87,33 @@ body {
   color: var(--teal);
   margin-bottom: 26px;
 }
+
 .brand b { color: var(--amber); font-weight: normal; }
+
 h1 {
   font-family: var(--font-pixel);
-  font-size: clamp(14px, 4vw, 20px);
-  line-height: 1.5;
+  font-size: clamp(15px, 4.4vw, 22px);
+  line-height: 1.55;
   color: var(--cream);
+  margin-bottom: 20px;
+}
+
+h1 span { color: var(--amber); }
+
+.lead {
+  color: var(--cream);
+  font-size: 22px;
   margin-bottom: 18px;
 }
-h1 span { color: var(--amber); }
-p { color: var(--cream-dim); font-size: 22px; line-height: 1.4; margin-bottom: 28px; }
+
+.note {
+  color: var(--cream-dim);
+  font-size: 19px;
+  border-top: 2px dashed var(--line);
+  padding-top: 18px;
+  margin-bottom: 26px;
+}
+
 .blink {
   font-family: var(--font-pixel);
   font-size: 9px;
@@ -58,8 +121,18 @@ p { color: var(--cream-dim); font-size: 22px; line-height: 1.4; margin-bottom: 2
   letter-spacing: 2px;
   animation: blink 1.2s steps(1) infinite;
 }
+
 @keyframes blink { 50% { opacity: 0; } }
-/* gigi roda pixel */
-.gear svg rect { animation: spin 3s linear infinite; transform-box: fill-box; transform-origin: center; }
-.gear svg rect:nth-child(2n) { animation-duration: 2.4s; animation-direction: reverse; }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Hormati preferensi pengguna yang mematikan animasi. */
+@media (prefers-reduced-motion: reduce) {
+  .gear svg { animation: none; }
+  .blink { animation: none; }
+}
+
+@media (max-width: 480px) {
+  body { padding: 16px; }
+  .box { padding: 32px 22px 30px; box-shadow: 6px 6px 0 rgba(0, 0, 0, .45); }
+  .lead { font-size: 20px; }
+  .note { font-size: 18px; }
+}

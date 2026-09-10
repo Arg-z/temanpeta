@@ -13,6 +13,49 @@
 	root * /srv/www
 	encode zstd gzip
 
+	# ---------- mode pemeliharaan ----------
+	# Aktif bila file penanda /srv/www/maint/ON ada. Folder ./maintenance di
+	# host di-mount ke /srv/www/maint (lihat docker-compose.yml), jadi
+	# menghidupkan/mematikan mode ini cukup membuat/menghapus file penanda —
+	# TANPA rebuild image dan TANPA restart container.
+	#   nyalakan : ./deploy/maintenance.sh on
+	#   matikan  : ./deploy/maintenance.sh off
+	# Blok ini sengaja di paling atas: `handle` bersifat saling-eksklusif dan
+	# diurutkan sesuai posisinya, jadi selama penanda ada, semua rute lain
+	# (termasuk /api dan /ws) tidak akan pernah dieksekusi.
+
+	# API & WebSocket saat pemeliharaan: 503 JSON, bukan halaman HTML —
+	# supaya klien yang menunggu JSON tidak salah mengurai HTML.
+	@maint_api {
+		file /maint/ON
+		path /api/* /ws
+	}
+	handle @maint_api {
+		header Cache-Control "no-store"
+		respond "{\"error\":\"Sedang dalam pemeliharaan. Coba lagi sebentar lagi.\"}" 503
+	}
+
+	# File penanda tidak boleh bisa diunduh dari luar.
+	@maint_flag {
+		file /maint/ON
+		path /maint/ON
+	}
+	handle @maint_flag {
+		respond 404
+	}
+
+	# Semua permintaan lain disajikan halaman pemeliharaan. `root` diarahkan
+	# ke folder maintenance sehingga /style.css ikut tersedia di root yang sama.
+	@maint file /maint/ON
+	handle @maint {
+		header Cache-Control "no-store"
+		root * /srv/www/maint
+		try_files {path} /index.html
+		file_server
+	}
+
+	# ---------- mode normal ----------
+
 	# API dan WebSocket ke backend Node — pakai handle agar tidak
 	# ke-rewrite dulu oleh try_files (urutan direktif Caddy: try_files
 	# berjalan sebelum reverse_proxy).

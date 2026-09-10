@@ -44,6 +44,10 @@ services:
     volumes:
       # zoneinfo host: image dasar (caddy:alpine) tanpa tzdata.
       - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
+      # Halaman pemeliharaan + file penanda. Mode maintenance dihidupkan
+      # dengan membuat ./maintenance/ON di host (lihat deploy/maintenance.sh) —
+      # Caddy membacanya lewat matcher `file /maint/ON`. Tanpa rebuild container.
+      - ./maintenance:/srv/www/maint:ro
     ports:
       # Terikat ke loopback saja: nginx (yang memegang 80/443 publik bersama
       # situs lain) meneruskan trafik connext.web.id ke sini.

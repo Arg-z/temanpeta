@@ -7,3 +7,7 @@ dist/
 test-results/
 playwright-report/
 deploy/backup-*.conf.*
+# Mode pemeliharaan (lihat deploy/maintenance.sh)
+maintenance/ON
+maintenance/.landing-*.html
+landing/style.css
