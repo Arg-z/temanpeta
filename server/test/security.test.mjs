@@ -613,3 +613,44 @@ test('WS oversized: koneksi ditutup 1009 tanpa menjatuhkan server', async (t) =>
   assert.ok(!output.includes("Unhandled 'error' event"), output);
 });
 
+test('bio: tersimpan ternormalisasi, publik, dan divalidasi', async () => {
+  const a = await fixture('bioA');
+  const b = await fixture('bioB');
+
+  // Bawaan: belum diisi.
+  assert.equal((await a.fetch('/me')).json.user.bio, null);
+
+  // Simpan bio berantakan — server merapikan spasi/baris & membuang kontrol.
+  const simpan = await a.fetch('/me', {
+    method: 'PATCH',
+    body: { bio: '  Halo   dunia\x07\n\n\n\nbaris dua  ' },
+  });
+  assert.equal(simpan.status, 200);
+  assert.equal(simpan.json.user.bio, 'Halo dunia\n\nbaris dua');
+
+  // Publik: pengguna lain melihat bio walau visibilitas wilayah pemiliknya mati.
+  const lihat = await b.fetch(`/users/${a.user.publicId}`);
+  assert.equal(lihat.status, 200);
+  assert.equal(lihat.json.user.bio, 'Halo dunia\n\nbaris dua');
+
+  // Terlalu panjang (> 160) dan bukan string ditolak.
+  assert.equal((await a.fetch('/me', { method: 'PATCH', body: { bio: 'x'.repeat(161) } })).status, 400);
+  assert.equal((await a.fetch('/me', { method: 'PATCH', body: { bio: 123 } })).status, 400);
+
+  // Batas atas tepat 160 karakter tetap diterima.
+  assert.equal((await a.fetch('/me', { method: 'PATCH', body: { bio: 'x'.repeat(160) } })).status, 200);
+
+  // Bio kosong/spasi saja = hapus.
+  const hapus = await a.fetch('/me', { method: 'PATCH', body: { bio: '   ' } });
+  assert.equal(hapus.status, 200);
+  assert.equal(hapus.json.user.bio, null);
+
+  // Pemblokir tidak mendapat bio pihak yang ia blokir.
+  await a.fetch('/me', { method: 'PATCH', body: { bio: 'rahasia' } });
+  await b.fetch('/blocks', { method: 'POST', body: { publicId: a.user.publicId } });
+  const diblokir = await b.fetch(`/users/${a.user.publicId}`);
+  assert.equal(diblokir.status, 200);
+  assert.equal(diblokir.json.blockedByMe, true);
+  assert.equal(diblokir.json.user.bio, null, 'bio disembunyikan dari pemblokir');
+});
+

@@ -8,6 +8,8 @@ export function userCard(row, { isFriend = false } = {}) {
   return {
     publicId: row.public_id,
     nickname: row.nickname,
+    // Bio bersifat publik seperti nickname — tidak ikut aturan visibilitas wilayah.
+    bio: row.bio ?? null,
     visibility: row.visibility,
     // Wilayah hanya tampak bila visibilitas nyala, atau bagi teman.
     region:
@@ -26,6 +28,7 @@ export function selfUser(row) {
     publicId: row.public_id,
     loginId: row.login_id,
     nickname: row.nickname,
+    bio: row.bio ?? null,
     visibility: row.visibility,
     isAdmin: Boolean(row.is_admin),
     region: region

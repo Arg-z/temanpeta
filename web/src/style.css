@@ -63,6 +63,23 @@ input:focus {
   border-color: var(--teal);
 }
 
+/* Textarea (mis. bio di panel Profilku) mengikuti gaya input teks.
+   .modal-textarea punya aturannya sendiri yang lebih spesifik. */
+textarea {
+  font-family: var(--font-body);
+  font-size: 19px;
+  color: var(--cream);
+  background: var(--ink);
+  border: 2px solid var(--line);
+  padding: 8px 10px;
+  outline: none;
+  width: 100%;
+}
+
+textarea:focus {
+  border-color: var(--teal);
+}
+
 ::placeholder {
   color: var(--cream-dim);
 }
@@ -660,6 +677,45 @@ input:focus {
   flex-direction: column;
   gap: 8px;
   margin-top: 14px;
+}
+
+/* bio — kolom isian di Profilku, dan teks di profil orang lain */
+
+.bio-input {
+  display: block;
+  resize: vertical;
+  min-height: 74px;
+  line-height: 1.25;
+  margin-top: 4px;
+}
+
+.bio-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.bio-hint {
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--cream-dim);
+}
+
+.bio-count {
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  color: var(--cream-dim);
+  white-space: nowrap;
+}
+
+/* Bio milik orang lain: baris baru dihormati, kata panjang tetap di dalam panel. */
+.bio-text {
+  margin-top: 2px;
+  line-height: 1.35;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- chat ---------- */

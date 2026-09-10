@@ -55,6 +55,26 @@ export function haversineKm(lat1, lng1, lat2, lng2) {
 
 export const LOGIN_ID_RE = /^[a-z0-9_]{3,24}$/;
 
+// Bio profil: panjang maksimum dalam satuan UTF-16 (selaras dengan atribut
+// maxlength pada textarea di frontend).
+export const BIO_MAX = 160;
+
+// Rapikan bio sebelum disimpan. Baris baru diizinkan (bio boleh dua baris),
+// tetapi karakter kontrol C0/C1 lain dibuang supaya input klien tidak bisa
+// menyelipkan karakter kendali ke tampilan orang lain. Zero-width joiner
+// (U+200D) sengaja DIPERTAHANKAN agar emoji gabungan tetap utuh.
+// Mengembalikan null bila nilai bukan string (pemanggil membalas 400).
+export function normalizeBio(value) {
+  if (typeof value !== 'string') return null;
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/[^\S\n]+/g, ' ') // tab/spasi beruntun → satu spasi
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export function bad(res, status, message) {
   return res.status(status).json({ error: message });
 }

@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS reports (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT false;
 
+-- Bio singkat opsional yang tampil di profil orang lain. NULL = belum diisi.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+
 -- Log peristiwa masuk untuk admin: perangkat (dari user-agent) + IP +
 -- perkiraan lokasi IP. user_id ON DELETE SET NULL: jejak tetap ada sebagai
 -- "(akun terhapus)" agar pelanggaran tidak hilang lewat hapus akun. Kolom

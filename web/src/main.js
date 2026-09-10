@@ -699,12 +699,12 @@ function openMePanel() {
         toast('Gagal menyalin — salin manual: ' + state.me.publicId, true);
       }
     },
-    onSaveNickname: async (nickname) => {
+    onSave: async ({ nickname, bio }) => {
       try {
-        const { user } = await api('/me', { method: 'PATCH', body: { nickname } });
+        const { user } = await api('/me', { method: 'PATCH', body: { nickname, bio } });
         state.me = user;
         state.ui.setMe(user);
-        toast('Nickname disimpan.');
+        toast('Perubahan disimpan.');
       } catch (err) {
         toast(err.message, true);
       }

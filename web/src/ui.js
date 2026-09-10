@@ -1,5 +1,9 @@
 // Komponen UI TemanPeta: DOM murni, tanpa framework.
 
+// Harus sama dengan BIO_MAX di server/src/util.js — dipakai untuk atribut
+// maxlength dan penghitung karakter pada panel Profilku.
+const BIO_MAX = 160;
+
 export function el(tag, props = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
@@ -793,6 +797,15 @@ export function renderProfilePanel(panel, { user, relation, blockedByMe, onClose
         el('div', { class: 'k', text: 'NICKNAME' }),
         el('div', { text: user.nickname }),
       ),
+      // Bio publik: ditampilkan apa adanya sebagai teks (baris baru dihormati CSS).
+      user.bio
+        ? el(
+            'div',
+            { class: 'row' },
+            el('div', { class: 'k', text: 'BIO' }),
+            el('div', { class: 'bio-text', text: user.bio }),
+          )
+        : null,
       el('div', { class: 'k', text: 'ID PUBLIK' }),
       el('div', { class: 'big-id', text: user.publicId }),
       el(
@@ -812,9 +825,25 @@ export function renderProfilePanel(panel, { user, relation, blockedByMe, onClose
   );
 }
 
-export function renderMePanel(panel, { me, onClose, onSaveNickname, onCopyId, onLogout }) {
+export function renderMePanel(panel, { me, onClose, onSave, onCopyId, onLogout }) {
   const body = panelFrame(panel, 'PROFILKU', onClose);
   const nick = el('input', { value: me.nickname, maxlength: '24' });
+  // Nilai awal textarea lewat text node — atribut `value` tidak berlaku di <textarea>.
+  const bio = el(
+    'textarea',
+    {
+      class: 'bio-input',
+      maxlength: String(BIO_MAX),
+      rows: '3',
+      placeholder: 'Ceritakan sedikit tentang dirimu (opsional)',
+      'aria-label': 'Bio profil',
+    },
+    me.bio ?? '',
+  );
+  const bioCount = el('div', { class: 'bio-count', text: `${(me.bio ?? '').length}/${BIO_MAX}` });
+  bio.addEventListener('input', () => {
+    bioCount.textContent = `${bio.value.length}/${BIO_MAX}`;
+  });
   body.append(
     el(
       'div',
@@ -846,6 +875,18 @@ export function renderMePanel(panel, { me, onClose, onSaveNickname, onCopyId, on
       el(
         'div',
         { class: 'row' },
+        el('div', { class: 'k', text: 'BIO' }),
+        bio,
+        el(
+          'div',
+          { class: 'bio-meta' },
+          el('span', { class: 'bio-hint', text: 'Tampil ke siapa pun yang membuka profilmu.' }),
+          bioCount,
+        ),
+      ),
+      el(
+        'div',
+        { class: 'row' },
         el('div', { class: 'k', text: 'WILAYAH' }),
         el('div', { text: me.region?.name ?? 'belum disetel — nyalakan "Tampilkan saya di peta" untuk mendeteksi otomatis' }),
       ),
@@ -856,7 +897,11 @@ export function renderMePanel(panel, { me, onClose, onSaveNickname, onCopyId, on
       el(
         'div',
         { class: 'btns' },
-        el('button', { class: 'btn', text: 'SIMPAN NICKNAME', onclick: () => onSaveNickname(nick.value.trim()) }),
+        el('button', {
+          class: 'btn',
+          text: 'SIMPAN PERUBAHAN',
+          onclick: () => onSave?.({ nickname: nick.value.trim(), bio: bio.value }),
+        }),
         el('button', { class: 'btn btn-ghost', text: 'KELUAR', onclick: onLogout }),
       ),
     ),

@@ -42,6 +42,7 @@ Bentuk `user` (milik sendiri):
   "publicId": "9SSS73HX",
   "loginId": "budi",
   "nickname": "Budi",
+  "bio": "Suka kopi dan peta 🗺️" | null,
   "visibility": false,
   "region": { "code": "ID.30.3273", "name": "Bandung, Jawa Barat" } | null,
   "createdAt": "2026-09-05T09:08:39.619Z"
@@ -52,7 +53,7 @@ Bentuk `user` (milik sendiri):
 
 | Metode & path | Body | Respons | Catatan |
 |---|---|---|---|
-| `PATCH /api/me` | `{nickname?, visibility?}` | `200 {user}` | |
+| `PATCH /api/me` | `{nickname?, visibility?, bio?}` | `200 {user}` | `bio` maks 160 karakter; string kosong menghapus bio (jadi `null`). |
 | `POST /api/me/location` | `{lat, lng}` | `200 {region, user}` | Server melengkapi koordinat ke kabupaten/kota terdekat (≤ 60 km) atau provinsi terdekat. **Tidak ada koordinat yang disimpan** — hanya kode wilayah. |
 
 ### Wilayah & pencarian
@@ -72,6 +73,7 @@ Bentuk `UserCard` (pengguna lain):
 {
   "publicId": "88PSZJQP",
   "nickname": "Sari",
+  "bio": "Anak Bandung, hobi fotografi" | null,
   "visibility": true,
   "region": { "code": "...", "name": "Bandung, Jawa Barat" } | null,
   "online": true,
@@ -80,6 +82,8 @@ Bentuk `UserCard` (pengguna lain):
 ```
 
 `region` bernilai `null` bila visibilitas mati, **kecuali** untuk teman (teman selalu melihat wilayah, tanpa koordinat presisi). Koordinat centroid `lat`/`lng` pada hasil pencarian mengikuti aturan yang sama dan bernilai `null` ketika wilayah disembunyikan.
+
+`bio` bersifat **publik** seperti `nickname` — tidak ikut aturan visibilitas wilayah, jadi tetap terlihat walau `visibility` mati. Satu-satunya pengecualian: pada lookup profil oleh pemblokir (`blockedByMe: true`), `bio` ikut disembunyikan (`null`) bersama `region` dan `online`.
 
 Blokir berlaku dua arah pada peta kehadiran dan event kehadiran WebSocket.
 Lookup profil pemblokir dari pihak yang diblokir mendapat `404`. Pemblokir
@@ -154,6 +158,7 @@ Klien yang terputus otomatis menyambung ulang (disarankan jeda eksponensial).
 2. Visibilitas bawaan **mati**; wilayah pengguna hanya tampak saat nyala (atau bagi temannya).
 3. Pengguna yang saling memblokir tidak saling terlihat di pencarian/daftar wilayah.
 4. ID login dan hash password tidak pernah muncul di respons apa pun.
+5. Bio bersifat publik (seperti nickname), tetapi karakter kontrol C0/C1 dibuang saat disimpan agar input satu pengguna tidak merusak tampilan pengguna lain.
 
 ---
 

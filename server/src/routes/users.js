@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAuth } from '../auth.js';
-import { bad, rateLimit } from '../util.js';
+import { bad, rateLimit, normalizeBio, BIO_MAX } from '../util.js';
 import { searchRegions, snapLocation, getRegion } from '../regions.js';
 import { userCard, selfUser, getUserByPublicId, isFriendPair, relationTo } from '../cards.js';
 import { broadcastOthers, isOnline } from '../ws.js';
@@ -76,6 +76,14 @@ router.patch('/me', meLimiter, async (req, res, next) => {
     if (req.body.visibility !== undefined) {
       params.push(Boolean(req.body.visibility));
       updates.push(`visibility = $${params.length}`);
+    }
+    if (req.body.bio !== undefined) {
+      const bio = normalizeBio(req.body.bio);
+      if (bio === null) return bad(res, 400, 'Bio harus berupa teks.');
+      if (bio.length > BIO_MAX) return bad(res, 400, `Bio maksimal ${BIO_MAX} karakter.`);
+      // Bio kosong berarti dihapus (NULL), bukan string kosong.
+      params.push(bio === '' ? null : bio);
+      updates.push(`bio = $${params.length}`);
     }
     if (updates.length === 0) return bad(res, 400, 'Tidak ada perubahan.');
     const { rows } = await query(
@@ -220,8 +228,8 @@ router.get('/users/:publicId', lookupLimiter, async (req, res, next) => {
     const card = userCard(other, { isFriend: relation === 'friend' });
     return res.json({
       // Pemblokir tetap dapat membuka profil untuk membatalkan blokir,
-      // tetapi tidak mendapat wilayah atau status kehadiran pihak lain.
-      user: blockedByMe ? { ...card, visibility: false, region: null, online: false } : card,
+      // tetapi tidak mendapat wilayah, bio, atau status kehadiran pihak lain.
+      user: blockedByMe ? { ...card, visibility: false, region: null, online: false, bio: null } : card,
       relation,
       blockedByMe,
     });
