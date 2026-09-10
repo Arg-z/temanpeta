@@ -298,7 +298,10 @@ function refreshPresence() {
   if (!bisaLihatTitik()) return;
   api('/presence-map')
     .then(({ users }) => {
-      if (!state.me?.visibility) return;
+      // Cek ulang setelah await: status bisa berubah saat permintaan berjalan.
+      // Konsisten dengan bisaLihatTitik() — admin (mode pengamat) tetap
+      // melihat titik meski visibilitasnya sendiri mati.
+      if (!bisaLihatTitik()) return;
       for (const u of users) {
         if (state.friends.some((f) => f.publicId === u.publicId)) continue;
         state.map.showUser(u, 'stranger');
@@ -363,7 +366,7 @@ function handleWsEvent(ev) {
     case 'friend_request.accepted': {
       if (!state.friends.some((f) => f.publicId === ev.friend.publicId)) {
         state.friends.push(ev.friend);
-        if (ev.friend.online && ev.friend.visibility && state.me?.visibility) {
+        if (ev.friend.online && ev.friend.visibility && bisaLihatTitik()) {
           state.map.showUser(ev.friend, 'friend');
         }
       }
@@ -513,6 +516,9 @@ function closePanel() {
   hidePanel(state.ui.panel);
   state.ui.panel.dataset.view = '';
   state.map.clearStrangers();
+  // Titik global kembali seketika setelah panel ditutup — tanpa ini peta
+  // kosong sampai interval presence berikutnya (60 detik) menyegarkan.
+  refreshPresence();
 }
 
 /* ---------- profil ---------- */
