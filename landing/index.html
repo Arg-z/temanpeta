@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>TemanPeta — Ngobrol 1-lawan-1 se-wilayah di peta Indonesia</title>
+<title>TemanPeta — Ngobrol 1-lawan-1 sama orang sewilayah, di peta Indonesia</title>
 <meta name="description" content="TemanPeta: aplikasi chat pribadi 1-lawan-1 berbasis wilayah di Indonesia. Daftar dengan ID bebas, dapat ID publik 8 karakter, temukan orang lewat peta 38 provinsi & 514 kabupaten/kota, tanpa grup dan tanpa GPS presisi." />
 <meta name="theme-color" content="#101a2e" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23101a2e'/><rect x='6' y='6' width='88' height='88' fill='none' stroke='%233fc1b0' stroke-width='6'/><rect x='22' y='34' width='56' height='6' fill='%23e9a94e'/><rect x='22' y='46' width='40' height='6' fill='%23f0e6d2'/><rect x='22' y='58' width='48' height='6' fill='%233fc1b0'/></svg>" />
@@ -221,7 +221,7 @@ section { position: relative; }
 .step .arrow { margin-top: 18px; font-size: 22px; color: var(--teal); }
 
 /* ---------- privacy / feature split ---------- */
-.split { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; margin-top: 40px; }
+.split { display: grid; grid-template-columns: 1fr; gap: 60px; margin-top: 40px; max-width: 760px; }
 .split-h { font-family: var(--font-sans); font-weight: 700; font-size: clamp(24px, 2.6vw, 34px); margin-bottom: 22px; color: var(--cream); }
 .split-h .acc { color: var(--teal); }
 .split ul { list-style: none; }
@@ -229,19 +229,6 @@ section { position: relative; }
 .split li:last-child { border-bottom: none; }
 .split li::before { content: '▸'; position: absolute; left: 0; color: var(--teal); font-size: 22px; }
 .split li b { color: var(--cream); font-weight: normal; }
-
-.code-card {
-  background: var(--ink); border: 2px solid var(--line);
-  padding: 24px; font-family: 'VT323', monospace; font-size: 18px;
-  box-shadow: 8px 8px 0 rgba(0,0,0,.35); position: relative;
-}
-.code-card .cc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 13px; color: var(--cream-dim); }
-.code-card .dots { display: flex; gap: 6px; }
-.code-card .dots i { width: 10px; height: 10px; display: inline-block; border-radius: 50%; }
-.code-card pre { color: var(--cream); line-height: 1.7; overflow-x: auto; }
-.code-card .t { color: var(--teal); }
-.code-card .a { color: var(--amber); }
-.code-card .g { color: var(--green); }
 
 /* ---------- CTA ---------- */
 .cta-band {
@@ -294,7 +281,6 @@ footer { border-top: 1px solid var(--line); padding: 50px 0 60px; background: va
       <a href="#fitur">Fitur</a>
       <a href="#cara">Cara Kerja</a>
       <a href="#privasi">Privasi</a>
-      <a href="#teknis">Teknis</a>
       <a class="btn nav-cta" href="https://app.connext.web.id" target="_blank" rel="noopener">MASUK APP ▸</a>
     </div>
   </div>
@@ -309,15 +295,15 @@ footer { border-top: 1px solid var(--line); padding: 50px 0 60px; background: va
       <div class="kicker">SOCIAL MAP CHAT</div>
       <h1>
         Ngobrol <span class="pixel">1-lawan-1</span><br/>
-        dengan tetangga <span class="acc-teal">se-wilayah</span><br/>
-        kamu, di <span class="acc-amber">peta</span>.
+        dengan orang <span class="acc-teal">sewilayah</span>,<br/>
+        langsung di <span class="acc-amber">peta</span>.
       </h1>
       <p class="hero-sub">
-        TemanPeta menghubungkan kamu dengan orang di sekitarmu. Daftar pake ID bebas,
-        dapat ID publik 8 karakter, terus langsung ngobrol. Nggak ada grup, nggak ada GPS presisi.
+        TemanPeta nyambungin kamu sama orang di wilayahmu. Daftar pake ID bebas,
+        dapat ID publik 8 karakter, langsung bisa ngobrol. Nggak ada grup, nggak ada GPS presisi.
       </p>
       <div class="hero-cta">
-        <a class="btn btn-primary" href="https://app.connext.web.id" target="_blank" rel="noopener">MULAI NGOPI ▸</a>
+        <a class="btn btn-primary" href="https://app.connext.web.id" target="_blank" rel="noopener">MULAI NGOBROL ▸</a>
         <a class="btn btn-ghost" href="#cara">Lihat cara kerja</a>
       </div>
       <div class="hero-stats">
@@ -408,7 +394,7 @@ footer { border-top: 1px solid var(--line); padding: 50px 0 60px; background: va
       <div class="fcard reveal">
         <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="20" y="2" width="6" height="10" fill="#e9a94e"/><rect x="14" y="12" width="6" height="8" fill="#e9a94e"/><rect x="8" y="20" width="6" height="10" fill="#e9a94e"/><rect x="14" y="12" width="6" height="8" fill="#3fc1b0"/><rect x="8" y="20" width="6" height="10" fill="#3fc1b0"/></svg></div>
         <h3><span class="n">05</span>Saling Tampil</h3>
-        <p>Kamu lihat titik orang lain cuma kalau kamu juga tampil. Privasi dua arah, dua-duanya dilindungi.</p>
+        <p>Kamu lihat titik orang lain cuma kalau kamu juga tampil. Privasi dua arah — kamu dan dia sama-sama terlindungi.</p>
         <div class="chip-row"><span class="chip">2-ARAH</span><span class="chip">VISIBILITAS</span></div>
       </div>
       <div class="fcard reveal">
@@ -462,59 +448,7 @@ footer { border-top: 1px solid var(--line); padding: 50px 0 60px; background: va
           <li><b>Blokir dan lapor</b>. Kamu yang pegang kendali siapa yang bisa menghubungimu.</li>
           <li><b>Lupa password?</b> Pemulihan akun belum ada, jadi catat ID dan password-mu baik-baik.</li>
         </ul>
-      </div>
-      <div class="reveal">
-        <div class="code-card">
-          <div class="cc-head">
-            <span>SESSION — aman</span>
-            <span class="dots"><i style="background:#d96459"></i><i style="background:#e9a94e"></i><i style="background:#7bc96f"></i></span>
-          </div>
-          <pre><span class="t">POST</span> /login
-  <span class="a">loginId</span>: "budi_01"      <span class="g">// privat</span>
-  <span class="a">password</span>: "********"    <span class="g">// min. 8</span>
-
-<span class="t">200</span> OK
-  Set-Cookie: <span class="a">session</span>=… <span class="g">; HttpOnly; Secure</span>
-
-→ <span class="a">ID publik</span>: <span class="g">k7tY9pQ2</span>  <span class="g">// 8 karakter, dicari orang</span></pre>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ================= TECH ================= -->
-<section id="teknis" class="sec-pad dark-band">
-  <div class="wrap sec-in">
-    <div class="sec-tag sec-tag-flat">// 04 — TEKNIS</div>
-    <h2 class="sec-head sec-cent">Dibangun ramping, nggak gembul</h2>
-    <p class="sec-sub sec-cent">Arsitektur minimal, fokus ke yang kepake. Nggak nambah-nambah fitur yang nggak ada gunanya.</p>
-    <div class="features" style="margin-top:46px">
-      <div class="fcard reveal">
-        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="3" y="5" width="26" height="17" fill="#3fc1b0" opacity=".22"/><rect x="3" y="5" width="26" height="4" fill="#3fc1b0"/><rect x="7" y="12" width="10" height="4" fill="#e9a94e"/><rect x="13" y="22" width="6" height="3" fill="#3fc1b0"/><rect x="9" y="25" width="14" height="3" fill="#3fc1b0"/></svg></div>
-        <h3>Frontend Vanilla</h3>
-        <p>Tanpa framework. Vanilla JS + MapLibre + DOM murni. Halaman ringan, muat cepat, minim jejak.</p>
-        <div class="chip-row"><span class="chip">VANILLA JS</span></div>
-      </div>
-      <div class="fcard reveal">
-        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="13" y="2" width="6" height="7" fill="#3fc1b0"/><rect x="13" y="23" width="6" height="7" fill="#3fc1b0"/><rect x="2" y="13" width="7" height="6" fill="#3fc1b0"/><rect x="23" y="13" width="7" height="6" fill="#3fc1b0"/><rect x="10" y="9" width="12" height="14" fill="#3fc1b0"/><rect x="14" y="13" width="4" height="4" fill="#e9a94e"/></svg></div>
-        <h3>Backend Node</h3>
-        <p>REST API + WebSocket pake Express, handle ribuan koneksi realtime dengan mulus.</p>
-        <div class="chip-row"><span class="chip">EXPRESS</span><span class="chip">WS</span></div>
-      </div>
-      <div class="fcard reveal">
-        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="6" y="6" width="20" height="6" fill="#3fc1b0"/><rect x="6" y="12" width="20" height="6" fill="#3fc1b0" opacity=".65"/><rect x="6" y="18" width="20" height="6" fill="#3fc1b0" opacity=".4"/><rect x="12" y="8" width="4" height="3" fill="#e9a94e"/><rect x="12" y="14" width="4" height="3" fill="#e9a94e"/><rect x="12" y="20" width="4" height="3" fill="#e9a94e"/></svg></div>
-        <h3>PostgreSQL</h3>
-        <p>Database relasional yang andal, nyimpen data wilayah 38 provinsi + 514 kab/kota.</p>
-        <div class="chip-row"><span class="chip">POSTGRES</span></div>
-      </div>
-      <div class="fcard reveal">
-        <div class="ficon"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" shape-rendering="crispEdges"><rect x="10" y="3" width="12" height="6" fill="#3fc1b0"/><rect x="6" y="9" width="20" height="6" fill="#3fc1b0"/><rect x="6" y="15" width="20" height="12" fill="#3fc1b0" opacity=".22"/><rect x="14" y="17" width="4" height="4" fill="#e9a94e"/><rect x="15" y="21" width="2" height="3" fill="#e9a94e"/></svg></div>
-        <h3>Hardening</h3>
-        <p>Rate-limit per-IP, anti-DoS, token di-hash saat disimpan, blokir path sensitif (.env, git, zip) di level server.</p>
-        <div class="chip-row"><span class="chip">ANTI-DOS</span><span class="chip">HASH AT REST</span></div>
-      </div>
-    </div>
+      </div>    </div>
   </div>
 </section>
 
@@ -524,7 +458,7 @@ footer { border-top: 1px solid var(--line); padding: 50px 0 60px; background: va
   <div class="wrap" style="position:relative; z-index:2">
     <div class="sec-tag sec-tag-flat sec-cent" style="justify-content:center">// READY?</div>
     <h2>Siap ketemu <span class="pixel">temanmu</span></h2>
-    <p>Kamu tinggal beberapa klik lagi dari ngobrol dengan orang di sekitarmu.</p>
+    <p>Tinggal beberapa klik lagi buat mulai ngobrol sama orang di wilayahmu.</p>
     <div class="cta-btn-row">
       <a class="btn btn-amber" href="https://app.connext.web.id" target="_blank" rel="noopener">BUKA APP ▸</a>
       <a class="btn btn-ghost" href="#top">Ke atas ↑</a>
@@ -545,12 +479,10 @@ footer { border-top: 1px solid var(--line); padding: 50px 0 60px; background: va
         <a href="#fitur">Fitur</a>
         <a href="#cara">Cara Kerja</a>
         <a href="#privasi">Privasi</a>
-        <a href="#teknis">Teknis</a>
-      </div>
+        </div>
       <div class="foot-col">
         <h4>INFO</h4>
         <a href="https://app.connext.web.id" target="_blank" rel="noopener">Buka App</a>
-        <a href="https://app.connext.web.id/manifest.json" target="_blank" rel="noopener">Manifest</a>
         <a href="#privasi">Kebijakan Privasi</a>
       </div>
     </div>
