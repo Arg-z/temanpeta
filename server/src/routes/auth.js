@@ -6,6 +6,7 @@ import {
   generatePublicId,
   LOGIN_ID_RE,
   DUMMY_PASSWORD_HASH,
+  normalizeNickname,
   bad,
   rateLimit,
   audit,
@@ -29,7 +30,9 @@ router.post('/register', limiter, async (req, res, next) => {
   try {
     const loginId = String(req.body.loginId ?? '').trim().toLowerCase();
     const password = String(req.body.password ?? '');
-    const nickname = String(req.body.nickname ?? '').trim();
+    // Nickname dinormalisasi: satu baris, tanpa karakter kendali/bidi —
+    // teksnya tampil di kartu pengguna lain.
+    const nickname = normalizeNickname(req.body.nickname);
 
     if (!LOGIN_ID_RE.test(loginId)) {
       return bad(res, 400, 'ID login harus 3-24 karakter: huruf kecil, angka, atau garis bawah.');
@@ -37,7 +40,7 @@ router.post('/register', limiter, async (req, res, next) => {
     if (password.length < 8 || password.length > 72) {
       return bad(res, 400, 'Password minimal 8 karakter.');
     }
-    if (nickname.length < 2 || nickname.length > 24) {
+    if (nickname === null || nickname.length < 2 || nickname.length > 24) {
       return bad(res, 400, 'Nickname harus 2-24 karakter.');
     }
 

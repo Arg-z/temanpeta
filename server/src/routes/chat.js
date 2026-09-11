@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query, pair } from '../db.js';
 import { requireAuth } from '../auth.js';
-import { bad, rateLimit, audit } from '../util.js';
+import { bad, rateLimit, audit, normalizeMessage } from '../util.js';
 import { getUserByPublicId, isFriendPair, blockedBetween } from '../cards.js';
 import { publish } from '../ws.js';
 
@@ -61,7 +61,9 @@ router.post('/messages', msgLimiter, async (req, res, next) => {
   try {
     const other = await requireConversation(req, res);
     if (!other) return;
-    const body = String(req.body.body ?? '').trim();
+    // Karakter kendali/bidi dibuang (bisa membalik arah tampilan teks di
+    // jendela penerima); spasi, baris baru, dan emoji dibiarkan apa adanya.
+    const body = (normalizeMessage(req.body.body) ?? '').trim();
     if (body.length === 0 || body.length > 2000) {
       return bad(res, 400, 'Pesan harus 1-2000 karakter.');
     }

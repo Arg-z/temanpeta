@@ -82,6 +82,34 @@ export function normalizeBio(value) {
     .trim();
 }
 
+// Karakter yang tidak boleh lolos ke teks tampilan apa pun: C0/C1, bidi
+// embed/override/isolate (Trojan Source — bisa MEMUTAR BALIK arah teks),
+// zero-width & pemisah tak terlihat. ZWJ (U+200D), ZWNJ (U+200C), variation
+// selector U+FE0E/U+FE0F dan tag flag sengaja TIDAK dihapus agar emoji utuh.
+const INVISIBLE_RE =
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u0080-\u009F\u00AD\u061C\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]/g;
+
+// Rapikan nickname: satu baris, tanpa karakter kendali/bidi/zero-width.
+// Mengembalikan null bila nilai bukan string (pemanggil membalas 400) —
+// tanpa ini String(obj) menghasilkan "[object Object]" yang lolos validasi.
+export function normalizeNickname(value) {
+  if (typeof value !== 'string') return null;
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(INVISIBLE_RE, '')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/\n+/g, ' ')
+    .trim();
+}
+
+// Bersihkan isi pesan chat: karakter kendali/bidi dibuang, sisanya (spasi,
+// baris baru, emoji) dibiarkan apa adanya — pesan bukan tempat merapikan
+// gaya penulisan pengguna.
+export function normalizeMessage(value) {
+  if (typeof value !== 'string') return null;
+  return value.replace(INVISIBLE_RE, '');
+}
+
 export function bad(res, status, message) {
   return res.status(status).json({ error: message });
 }

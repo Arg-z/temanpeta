@@ -5,6 +5,7 @@ import { isOnline } from './ws.js';
 // Bentuk data pengguna yang aman ditampilkan ke orang lain.
 export function userCard(row, { isFriend = false } = {}) {
   const showRegion = isFriend || row.visibility;
+  const reg = showRegion && row.region_code ? getRegion(row.region_code) : null;
   return {
     publicId: row.public_id,
     nickname: row.nickname,
@@ -12,10 +13,12 @@ export function userCard(row, { isFriend = false } = {}) {
     bio: row.bio ?? null,
     visibility: row.visibility,
     // Wilayah hanya tampak bila visibilitas nyala, atau bagi teman.
-    region:
-      showRegion && row.region_code
-        ? { code: row.region_code, name: regionName(row.region_code) }
-        : null,
+    region: reg ? { code: row.region_code, name: regionName(row.region_code) } : null,
+    // Centroid wilayah hanya ikut bila wilayahnya memang terlihat — dipakai
+    // frontend untuk menaruh titik realtime (mis. teman baru diterima) tanpa
+    // harus menunggu /friends-map. Tanpa kunci ini kartu tanpa lat/lng membuat
+    // putMarker() di frontend melewatkan titik.
+    ...(reg ? { lat: reg.lat, lng: reg.lng } : {}),
     online: isOnline(row.id),
     isFriend,
   };

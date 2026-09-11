@@ -23,8 +23,9 @@ const ALIAS_KOTA = {
 };
 
 function cocokAlias(region, q) {
-  const alias = region.aliases ?? [];
-  if (ALIAS_KOTA[region.name.toLowerCase()]) alias.push(...ALIAS_KOTA[region.name.toLowerCase()]);
+  // Salin dulu ke array baru: push ke region.aliases (objek yang dipakai
+  // bersama selama proses hidup) akan menumpuk duplikat di setiap pencarian.
+  const alias = [...(region.aliases ?? []), ...(ALIAS_KOTA[region.name.toLowerCase()] ?? [])];
   return alias.some((a) => a.toLowerCase().includes(q));
 }
 

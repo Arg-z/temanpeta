@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAuth } from '../auth.js';
-import { bad, rateLimit, normalizeBio, BIO_MAX } from '../util.js';
+import { bad, rateLimit, normalizeBio, normalizeNickname, BIO_MAX } from '../util.js';
 import { searchRegions, snapLocation, getRegion } from '../regions.js';
 import { userCard, selfUser, getUserByPublicId, isFriendPair, relationTo } from '../cards.js';
 import { broadcastOthers, isOnline } from '../ws.js';
@@ -66,8 +66,8 @@ router.patch('/me', meLimiter, async (req, res, next) => {
     const updates = [];
     const params = [req.user.id];
     if (req.body.nickname !== undefined) {
-      const nickname = String(req.body.nickname).trim();
-      if (nickname.length < 2 || nickname.length > 24) {
+      const nickname = normalizeNickname(req.body.nickname);
+      if (nickname === null || nickname.length < 2 || nickname.length > 24) {
         return bad(res, 400, 'Nickname harus 2-24 karakter.');
       }
       params.push(nickname);

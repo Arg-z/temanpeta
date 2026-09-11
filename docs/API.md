@@ -30,7 +30,7 @@ Tidak ada email di MVP — password yang lupa tidak dapat dipulihkan.
 
 | Metode & path | Body | Respons | Catatan |
 |---|---|---|---|
-| `POST /api/register` | `{loginId, password, nickname}` | `201 {token, user}` | `loginId`: 3-24 `[a-z0-9_]`; `password` ≥ 8; `nickname` 2-24. Dibatasi 30 percobaan/10 menit per IP. |
+| `POST /api/register` | `{loginId, password, nickname}` | `201 {token, user}` | `loginId`: 3-24 `[a-z0-9_]`; `password` ≥ 8; `nickname` 2-24 (dirapikan server: satu baris, tanpa karakter kendali/bidi). Dibatasi 30 percobaan/10 menit per IP. |
 | `POST /api/login` | `{loginId, password}` | `200 {token, user}` | 401 bila salah. |
 | `POST /api/logout` | — | `204` | Menghapus sesi. |
 | `GET /api/me` | — | `200 {user}` | |
@@ -53,7 +53,7 @@ Bentuk `user` (milik sendiri):
 
 | Metode & path | Body | Respons | Catatan |
 |---|---|---|---|
-| `PATCH /api/me` | `{nickname?, visibility?, bio?}` | `200 {user}` | `bio` maks 160 karakter; string kosong menghapus bio (jadi `null`). Server merapikan teks: spasi/baris berlebih dirapatkan, dan karakter kendali/tak terlihat (C0/C1, bidi override, zero-width) dibuang — emoji gabungan (ZWJ) tetap utuh. |
+| `PATCH /api/me` | `{nickname?, visibility?, bio?}` | `200 {user}` | `nickname` 2-24 dan `bio` maks 160 karakter; string kosong menghapus bio (jadi `null`). Server merapikan teks: spasi/baris berlebih dirapatkan, dan karakter kendali/tak terlihat (C0/C1, bidi override, zero-width) dibuang — emoji gabungan (ZWJ) tetap utuh. Berlaku sama untuk nickname dan isi pesan chat. |
 | `POST /api/me/location` | `{lat, lng}` | `200 {region, user}` | Server melengkapi koordinat ke kabupaten/kota terdekat (≤ 60 km) atau provinsi terdekat. **Tidak ada koordinat yang disimpan** — hanya kode wilayah. |
 
 ### Wilayah & pencarian
@@ -76,12 +76,13 @@ Bentuk `UserCard` (pengguna lain):
   "bio": "Anak Bandung, hobi fotografi" | null,
   "visibility": true,
   "region": { "code": "...", "name": "Bandung, Jawa Barat" } | null,
+  "lat": -6.9, "lng": 107.6,
   "online": true,
   "isFriend": false
 }
 ```
 
-`region` bernilai `null` bila visibilitas mati, **kecuali** untuk teman (teman selalu melihat wilayah, tanpa koordinat presisi). Koordinat centroid `lat`/`lng` pada hasil pencarian mengikuti aturan yang sama dan bernilai `null` ketika wilayah disembunyikan.
+`region` bernilai `null` bila visibilitas mati, **kecuali** untuk teman (teman selalu melihat wilayah, tanpa koordinat presisi). Centroid `lat`/`lng` hanya ikut saat wilayahnya memang terlihat (bila disembunyikan kedua kunci itu tidak ada) — dipakai frontend untuk menaruh titik realtime, mis. kartu teman pada `friend_request.accepted`.
 
 `bio` bersifat **publik** seperti `nickname` — tidak ikut aturan visibilitas wilayah, jadi tetap terlihat walau `visibility` mati. Satu-satunya pengecualian: pada lookup profil oleh pemblokir (`blockedByMe: true`), `bio` ikut disembunyikan (`null`) bersama `region` dan `online`.
 
