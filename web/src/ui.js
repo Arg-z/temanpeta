@@ -677,7 +677,6 @@ export function userCardNode(u, { onClick, actions = [], badge } = {}) {
       el(
         'div',
         { class: 'n' },
-        el('span', { class: `dot${u.online ? ' on' : ''}` }),
         u.nickname,
         badge ? el('span', { class: 'badge badge-msg', text: String(badge) }) : null,
       ),
@@ -813,12 +812,6 @@ export function renderProfilePanel(panel, { user, relation, blockedByMe, onClose
         { class: 'row' },
         el('div', { class: 'k', text: 'WILAYAH' }),
         el('div', { text: user.region?.name ?? 'disembunyikan' }),
-      ),
-      el(
-        'div',
-        { class: 'row' },
-        el('div', { class: 'k', text: 'STATUS' }),
-        el('div', {}, el('span', { class: `dot${user.online ? ' on' : ''}` }), user.online ? 'online' : 'offline'),
       ),
       btns.length > 0 ? el('div', { class: 'btns' }, ...btns) : null,
     ),

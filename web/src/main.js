@@ -394,13 +394,10 @@ function handleWsEvent(ev) {
       const f = state.friends.find((x) => x.publicId === ev.publicId);
       if (f) {
         f.online = ev.type === 'friend.online';
-        // Titik realtime: muncul saat online, hilang saat offline.
+        // Titik realtime di peta: muncul saat online, hilang saat offline.
         // Saling visibilitas: hanya digambar bila dua-duanya tampil di peta.
         if (bisaLihatTitik() && f.online && f.visibility) state.map.showUser(f, 'friend');
         else state.map.removeUser(f.publicId);
-        if (state.ui.panel.dataset.view === 'friends' && !state.ui.panel.classList.contains('hidden')) {
-          openFriendsPanel();
-        }
       }
       break;
     }
@@ -416,18 +413,6 @@ function handleWsEvent(ev) {
         );
       } else {
         state.map.removeUser(ev.publicId);
-        const u = state.regionCtx?.users.find((x) => x.publicId === ev.publicId);
-        if (u) {
-          u.online = false;
-          if (state.ui.panel.dataset.view === 'region' && !state.ui.panel.classList.contains('hidden')) {
-            renderRegionPanel(state.ui.panel, {
-              region: state.regionCtx.region,
-              users: state.regionCtx.users,
-              onClose: closePanel,
-              onOpenProfile: openProfile,
-            });
-          }
-        }
       }
       break;
     }
@@ -447,18 +432,6 @@ function handleWsEvent(ev) {
         );
       } else {
         state.map.removeUser(ev.publicId);
-      }
-      const u = state.regionCtx?.users.find((x) => x.publicId === ev.publicId);
-      if (u) {
-        u.visibility = ev.visible;
-        if (!ev.visible && state.ui.panel.dataset.view === 'region' && !state.ui.panel.classList.contains('hidden')) {
-          renderRegionPanel(state.ui.panel, {
-            region: state.regionCtx.region,
-            users: state.regionCtx.users,
-            onClose: closePanel,
-            onOpenProfile: openProfile,
-          });
-        }
       }
       break;
     }
