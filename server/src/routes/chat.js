@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query, pair } from '../db.js';
 import { requireAuth } from '../auth.js';
 import { bad, rateLimit, audit, normalizeMessage } from '../util.js';
+import { maskBadwords } from '../badwords.js';
 import { getUserByPublicId, isFriendPair, blockedBetween } from '../cards.js';
 import { publish } from '../ws.js';
 
@@ -67,19 +68,23 @@ router.post('/messages', msgLimiter, async (req, res, next) => {
     if (body.length === 0 || body.length > 2000) {
       return bad(res, 400, 'Pesan harus 1-2000 karakter.');
     }
+    // Filter kata kasar: pesan TETAP TERKIRIM, kata terlarang disensor jadi
+    // bintang. Versi tersensor itulah yang disimpan, diterima penerima, dan
+    // dikembalikan ke pengirim supaya keduanya melihat tampilan yang sama.
+    const tampil = maskBadwords(body);
     const [low, high] = pair(req.user.id, other.id);
     const { rows } = await query(
       'INSERT INTO messages (user_low, user_high, sender_id, body) VALUES ($1, $2, $3, $4) RETURNING id, created_at',
-      [low, high, req.user.id, body],
+      [low, high, req.user.id, tampil],
     );
     const message = {
       id: rows[0].id,
       from: req.user.public_id,
-      body,
+      body: tampil,
       createdAt: rows[0].created_at,
     };
     publish(other.id, { type: 'message.new', message });
-    return res.status(201).json({ id: message.id, createdAt: message.createdAt });
+    return res.status(201).json({ id: message.id, createdAt: message.createdAt, body: tampil });
   } catch (err) {
     return next(err);
   }

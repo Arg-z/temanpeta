@@ -667,3 +667,57 @@ test('bio: tersimpan ternormalisasi, publik, dan divalidasi', async () => {
   assert.equal(diblokir.json.user.bio, null, 'bio disembunyikan dari pemblokir');
 });
 
+// ---------------------------------------------------------------------------
+// Filter kata kasar: nickname/bio ditolak; pesan terkirim tapi tersensor
+// ---------------------------------------------------------------------------
+
+test('badword filter: nickname/bio kasar 400; pesan kasar terkirim tapi tersensor', async () => {
+  // Pendaftaran dengan nickname kasar langsung ditolak.
+  const c0 = client('bw_reg');
+  const r0 = await c0.fetch('/register', {
+    method: 'POST',
+    body: { loginId: `bwreg_${run}`, password: 'test12345678', nickname: 'Tolol 69' },
+  });
+  assert.equal(r0.status, 400);
+  assert.match(r0.json.error, /tidak pantas/);
+
+  const a = client('bw_a');
+  const b = client('bw_b');
+  await a.fetch('/register', {
+    method: 'POST', body: { loginId: `bwa_${run}`, password: 'test12345678', nickname: 'Baik A' },
+  });
+  const rb = await b.fetch('/register', {
+    method: 'POST', body: { loginId: `bwb_${run}`, password: 'test12345678', nickname: 'Baik B' },
+  });
+  const pid = rb.json.user.publicId;
+
+  // Jadikan teman agar jalur pesan terbuka.
+  await a.fetch('/friend-requests', { method: 'POST', body: { publicId: pid } });
+  const reqs = await b.fetch('/friend-requests');
+  const acc = await b.fetch(`/friend-requests/${reqs.json.incoming[0].id}/accept`, { method: 'POST' });
+  assert.equal(acc.status, 200);
+
+  // Pesan dengan kata kasar TETAP TERKIRIM, tetapi disensor di respons,
+  // di riwayat kedua pihak, dan di database.
+  const kasar = await a.fetch('/messages', { method: 'POST', body: { to: pid, body: 'anj1ing b4nget' } });
+  assert.equal(kasar.status, 201);
+  assert.equal(kasar.json.body, '******* b4nget', 'respons berisi versi tersensor untuk pengirim');
+
+  const lintas = await a.fetch('/messages', { method: 'POST', body: { to: pid, body: 'n g e n t o t' } });
+  assert.equal(lintas.status, 201);
+  assert.equal(lintas.json.body, '* * * * * * *', 'tier berat lintas token ikut tersensor');
+
+  // Riwayat menyimpan versi tersensor, bukan teks mentah.
+  const hist = await a.fetch(`/messages/${pid}`);
+  assert.deepEqual(hist.json.messages.map((m) => m.body), ['******* b4nget', '* * * * * * *']);
+
+  // Pesan baik terkirim tanpa perubahan; "pantai" tidak ikut tersensor.
+  const ok = await a.fetch('/messages', { method: 'POST', body: { to: pid, body: 'halo, makan pantai?' } });
+  assert.equal(ok.status, 201);
+  assert.equal(ok.json.body, 'halo, makan pantai?');
+
+  // Nickname dan bio lewat PATCH ikut difilter.
+  assert.equal((await a.fetch('/me', { method: 'PATCH', body: { nickname: 'goblok besar' } })).status, 400);
+  assert.equal((await a.fetch('/me', { method: 'PATCH', body: { bio: 'aku anjing' } })).status, 400);
+  assert.equal((await a.fetch('/me', { method: 'PATCH', body: { bio: 'penyuka pantai' } })).status, 200);
+});

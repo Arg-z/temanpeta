@@ -107,7 +107,7 @@ untuk membatalkan blokir, tetapi wilayah dan status online pihak itu disembunyik
 | Metode & path | Body | Respons | Catatan |
 |---|---|---|---|
 | `GET /api/messages/:publicId` | — | `{messages: [{id, mine, body, createdAt}]}` | Terlama → terbaru, maks 50. `?before=<id>` untuk halaman sebelumnya, `?limit=` maks 100. Hanya antar teman. |
-| `POST /api/messages` | `{to, body}` | `201 {id, createdAt}` | `body` 1-2000 karakter. Teman saja; diblokir → 403. |
+| `POST /api/messages` | `{to, body}` | `201 {id, createdAt, body}` | `body` 1-2000 karakter. Teman saja; diblokir → 403. Kata kasar disensor jadi bintang — `body` di respons adalah versi tersensor (lihat "Filter kata kasar" di bawah). |
 
 ### Blokir & laporan
 
@@ -171,4 +171,24 @@ Klien yang terputus otomatis menyambung ulang (disarankan jeda eksponensial).
 | `POST /api/admin/ban` | `{publicId, banned}` | `{ok, banned}` | Ban menutup semua sesi & koneksi WS paksa; unban membebaskan. |
 | `GET /api/admin/reports` | — | `{reports: [{created_at, pelapor, dilaporkan, reason}]}` | Terbaru dulu, maks 100. |
 
-Non-admin yang mengakses endpoint ini mendapat 403. Akun dengan `banned = true` tidak bisa login dan sesi lamanya langsung mati.
+Non-admin yang mengakses endpoint ini mendapat 403. Akun dengan `banned = true` tidak bisa login dan sesi lamanya langsung mati. Status kehadiran (online/tidak) tidak ditampilkan di panel admin — admin melihatnya dari titik di peta.
+
+### Filter kata kasar
+
+Pesan chat, nickname (register & `PATCH /api/me`), dan bio diperiksa terhadap
+daftar kata terlarang (`server/data/badwords.json`, dikurasi dari
+github.com/drizki/indonesian-badwords + Wiktionary "Istilah kasar").
+
+- **Pesan**: TETAP TERKIRIM. Kata terlarang diganti bintang sepanjang panjang
+  aslinya (`anjing` → `******`; `n g e n t o t` → `* * * * * * *`). Versi
+  tersensor itulah yang disimpan di database, diterima penerima via WS, dan
+  dikembalikan di respons REST agar pengirim melihat tampilan yang sama.
+- **Nickname & bio**: ditolak `400` dengan pesan ramah (menyensor nama jadi
+  `***` tidak wajar). Server tidak membocorkan kata mana yang cocok.
+
+Deteksi berlapis: pencocokan **per token** setelah normalisasi (leetspeak
+`anj1ng`→`anjing`, huruf beruntun `anjiiing` dirapatkan, pemisah `a.nj.ing`
+dibuang) + tier khusus kata berat yang dicocokkan pada teks tanpa spasi agar
+`n g e n t o t` tetap kena. Kata baik yang mengandung segmen kasar (`pantai`,
+`kanal`, `mentai`) aman karena `tai` tidak masuk tier tanpa-spasi dan
+pencocokan token bersifat persis.

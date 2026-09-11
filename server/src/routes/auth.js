@@ -22,6 +22,7 @@ import {
 import { selfUser } from '../cards.js';
 import { kickSession } from '../ws.js';
 import { recordLogin } from '../logins.js';
+import { containsBadword } from '../badwords.js';
 
 const router = Router();
 const limiter = rateLimit({ windowMs: 10 * 60_000, max: 30 });
@@ -42,6 +43,9 @@ router.post('/register', limiter, async (req, res, next) => {
     }
     if (nickname === null || nickname.length < 2 || nickname.length > 24) {
       return bad(res, 400, 'Nickname harus 2-24 karakter.');
+    }
+    if (containsBadword(nickname)) {
+      return bad(res, 400, 'Nickname mengandung kata yang tidak pantas. Pilih yang lain ya.');
     }
 
     for (let attempt = 0; attempt < 8; attempt += 1) {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAuth } from '../auth.js';
 import { bad, rateLimit, normalizeBio, normalizeNickname, BIO_MAX } from '../util.js';
+import { containsBadword } from '../badwords.js';
 import { searchRegions, snapLocation, getRegion } from '../regions.js';
 import { userCard, selfUser, getUserByPublicId, isFriendPair, relationTo } from '../cards.js';
 import { broadcastOthers, isOnline } from '../ws.js';
@@ -70,6 +71,9 @@ router.patch('/me', meLimiter, async (req, res, next) => {
       if (nickname === null || nickname.length < 2 || nickname.length > 24) {
         return bad(res, 400, 'Nickname harus 2-24 karakter.');
       }
+      if (containsBadword(nickname)) {
+        return bad(res, 400, 'Nickname mengandung kata yang tidak pantas. Pilih yang lain ya.');
+      }
       params.push(nickname);
       updates.push(`nickname = $${params.length}`);
     }
@@ -81,6 +85,9 @@ router.patch('/me', meLimiter, async (req, res, next) => {
       const bio = normalizeBio(req.body.bio);
       if (bio === null) return bad(res, 400, 'Bio harus berupa teks.');
       if (bio.length > BIO_MAX) return bad(res, 400, `Bio maksimal ${BIO_MAX} karakter.`);
+      if (containsBadword(bio)) {
+        return bad(res, 400, 'Bio mengandung kata yang tidak pantas. Ubah dulu ya.');
+      }
       // Bio kosong berarti dihapus (NULL), bukan string kosong.
       params.push(bio === '' ? null : bio);
       updates.push(`bio = $${params.length}`);

@@ -46,7 +46,9 @@ export function createChat(root, { onTyping, onOpenProfile, onSeen }) {
     try {
       const res = await api('/messages', { method: 'POST', body: { to, body } });
       if (version !== conversationVersion) return;
-      append({ id: res.id, body, createdAt: res.createdAt, mine: true });
+      // Server mengembalikan versi tersensor (bila ada kata terlarang) —
+      // tampilkan itu, bukan teks mentah yang diketik pengirim.
+      append({ id: res.id, body: res.body ?? body, createdAt: res.createdAt, mine: true });
     } catch (err) {
       if (version === conversationVersion) input.value = body;
       toast(err.message, true);
