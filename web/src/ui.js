@@ -752,11 +752,11 @@ export function renderRegionPanel(panel, { region, users, onClose, onOpenProfile
   for (const u of users) {
     body.append(
       userCardNode(u, {
-        actions: [
-          u.isFriend
-            ? null
-            : el('button', { class: 'btn btn-ghost', text: 'PROFIL', onclick: () => onOpenProfile(u.publicId) }),
-        ],
+        // actions kosong = userCardNode menampilkan tombol '›' pembuka profil.
+        // Jangan isi null: array [null] tetap ber-"isi", kartu teman jadi mati.
+        actions: u.isFriend
+          ? []
+          : [el('button', { class: 'btn btn-ghost', text: 'PROFIL', onclick: () => onOpenProfile(u.publicId) })],
       }),
     );
   }

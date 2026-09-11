@@ -77,6 +77,8 @@ function nicknameOf(publicId) {
 const bisaLihatTitik = () => Boolean(state.me?.visibility || state.me?.isAdmin);
 
 function syncFriendMarkers() {
+  // Peta sudah dilepas (logout / sesi berakhir) — tidak ada yang perlu disinkron.
+  if (!state.map) return;
   if (!bisaLihatTitik()) {
     state.map.clearOthers();
     return;
@@ -91,6 +93,10 @@ function showAuth() {
   state.socket = null;
   clearInterval(state.presenceTimer);
   state.presenceTimer = null;
+  // Lepaskan instansi peta: WebGL context di browser terbatas jumlahnya, dan
+  // tanpa map.remove() tiap siklus logout-login bocorkan satu context.
+  state.map?.map.remove();
+  state.map = null;
   renderAuth({
     onLogin: async (loginId, password) => {
       // Sesi disimpan server sebagai cookie HttpOnly — tidak ada token di JS.
@@ -244,7 +250,17 @@ function enterShell(me) {
     onSeen: (publicId, lastId) => markSeen(publicId, lastId),
   });
 
-  state.socket = createSocket({ onEvent: handleWsEvent });
+  state.socket = createSocket({
+    onEvent: handleWsEvent,
+    // Sambung-ulang: event friend.online/offline dll yang terlewat saat koneksi
+    // putus tidak direplay server — ambil ulang semua status dari REST.
+    onOpen: (reconnected) => {
+      if (!reconnected) return;
+      refreshFriends();
+      refreshRequests();
+      refreshPresence();
+    },
+  });
 
   refreshFriends();
   refreshRequests();
@@ -451,6 +467,9 @@ function handleWsEvent(ev) {
       state.friends = state.friends.filter((f) => f.publicId !== ev.publicId);
       state.map.removeUser(ev.publicId);
       if (state.chat.isActive(ev.publicId)) state.chat.close();
+      // Badge pesan dari mantan teman ikut dibersihkan — tanpa ini tetap
+      // menghitung sampai reload.
+      if (state.unread.delete(ev.publicId)) updateUnreadBadge();
       toast(`${nama} menghapus pertemanan`);
       break;
     }
@@ -599,6 +618,9 @@ async function unfriend(publicId) {
     state.friends = state.friends.filter((f) => f.publicId !== publicId);
     state.map.removeUser(publicId);
     if (state.chat.isActive(publicId)) state.chat.close();
+    // Server hanya memberi tahu pihak lain lewat WS — badge di siri sendiri
+    // harus dibersihkan di sini.
+    if (state.unread.delete(publicId)) updateUnreadBadge();
     closePanel();
     toast('Pertemanan dihapus.');
   } catch (err) {
@@ -621,6 +643,7 @@ function confirmBlock(user) {
               state.friends = state.friends.filter((f) => f.publicId !== user.publicId);
               state.map.removeUser(user.publicId);
               if (state.chat.isActive(user.publicId)) state.chat.close();
+              if (state.unread.delete(user.publicId)) updateUnreadBadge();
               toast(`${user.nickname} diblokir.`);
               openProfile(user.publicId);
             } catch (err) {

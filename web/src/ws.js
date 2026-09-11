@@ -13,8 +13,11 @@ export function createSocket({ onEvent, onOpen }) {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(`${proto}://${location.host}/ws`);
     ws.onopen = () => {
+      // Kabari pemanggil bila ini sambung-ulang (bukan koneksi pertama):
+      // event realtime yang terlewat saat putus tidak direplay server.
+      const reconnected = retry > 0;
       retry = 0;
-      onOpen?.();
+      onOpen?.(reconnected);
     };
     ws.onmessage = (e) => {
       try {
